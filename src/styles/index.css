@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme CSS Variables */
+:root {
+  /* Backgrounds */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #faf9f8;
+  --color-bg-tertiary: #f3f2f1;
+  --color-bg-hover: #f3f2f1;
+  --color-bg-selected: #e6f2fb;
+
+  /* Text */
+  --color-text-primary: #323130;
+  --color-text-secondary: #605e5c;
+  --color-text-disabled: #a19f9d;
+  --color-text-inverse: #ffffff;
+
+  /* Borders */
+  --color-border: #e1dfdd;
+  --color-border-strong: #c8c6c4;
+  --color-divider: #edebe9;
+
+  /* Accent (Azure DevOps blue) */
+  --color-accent: #0078d4;
+  --color-accent-hover: #005a9e;
+  --color-accent-dark: #106ebe;
+  --color-accent-light: #deecf9;
+
+  /* State colors - backgrounds */
+  --color-success-bg: #dff6dd;
+  --color-error-bg: #fde7e9;
+  --color-warning-bg: #fff4ce;
+  --color-info-bg: #deecf9;
+
+  /* State colors - text/icons */
+  --color-success: #107c10;
+  --color-error: #d13438;
+  --color-warning: #ffaa44;
+  --color-info: #0078d4;
+
+  /* Shadows */
+  --shadow-sm:
+    0 1.6px 3.6px 0 rgba(0, 0, 0, 0.132), 0 0.3px 0.9px 0 rgba(0, 0, 0, 0.108);
+  --shadow-md:
+    0 3.2px 7.2px 0 rgba(0, 0, 0, 0.132), 0 0.6px 1.8px 0 rgba(0, 0, 0, 0.108);
+  --shadow-lg:
+    0 6.4px 14.4px 0 rgba(0, 0, 0, 0.132), 0 1.2px 3.6px 0 rgba(0, 0, 0, 0.108);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #c8c6c4;
+  --scrollbar-track: #f3f2f1;
+}
+
+/* Dark theme */
+.dark {
+  /* Backgrounds - Azure DevOps dark theme inspired */
+  --color-bg-primary: #1f1f1f;
+  --color-bg-secondary: #252526;
+  --color-bg-tertiary: #2d2d30;
+  --color-bg-hover: #3e3e42;
+  --color-bg-selected: #094771;
+
+  /* Text */
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #cccccc;
+  --color-text-disabled: #6e6e6e;
+  --color-text-inverse: #1f1f1f;
+
+  /* Borders */
+  --color-border: #3e3e42;
+  --color-border-strong: #4d4d4d;
+  --color-divider: #333333;
+
+  /* Accent - slightly brighter in dark mode for visibility */
+  --color-accent: #4da6ff;
+  --color-accent-hover: #3399ff;
+  --color-accent-dark: #2b88d8;
+  --color-accent-light: #0d3a58;
+
+  /* State colors - backgrounds (darker versions) */
+  --color-success-bg: #1e3a1e;
+  --color-error-bg: #3a1e1e;
+  --color-warning-bg: #3a3a1e;
+  --color-info-bg: #1e2a3a;
+
+  /* State colors - text/icons (brighter for visibility) */
+  --color-success: #4caf50;
+  --color-error: #f44336;
+  --color-warning: #ffb74d;
+  --color-info: #4da6ff;
+
+  /* Shadows - more prominent in dark mode */
+  --shadow-sm:
+    0 1.6px 3.6px 0 rgba(0, 0, 0, 0.4), 0 0.3px 0.9px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md:
+    0 3.2px 7.2px 0 rgba(0, 0, 0, 0.4), 0 0.6px 1.8px 0 rgba(0, 0, 0, 0.3);
+  --shadow-lg:
+    0 6.4px 14.4px 0 rgba(0, 0, 0, 0.5), 0 1.2px 3.6px 0 rgba(0, 0, 0, 0.4);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #4d4d4d;
+  --scrollbar-track: #2d2d30;
+}
+
+/* Global styles */
+body {
+  @apply m-0 min-h-screen bg-surface font-sans text-content antialiased;
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-disabled);
+}

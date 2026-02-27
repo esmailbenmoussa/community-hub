@@ -1,0 +1,1 @@
+export { NewDiscussionModal } from './NewDiscussionModal';
