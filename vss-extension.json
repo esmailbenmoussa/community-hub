@@ -30,6 +30,9 @@
     }
   ],
   "screenshots": [],
+  "icons": {
+    "default": "public/icons/community-hub.png"
+  },
   "contributions": [
     {
       "id": "community-hub-group",
