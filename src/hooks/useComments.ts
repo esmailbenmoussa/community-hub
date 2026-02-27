@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Comment, CreateCommentInput } from '@/types';
+import { Comment, CommentReactionType, CreateCommentInput } from '@/types';
 import { commentService } from '@/services/comment.service';
 
 interface UseCommentsOptions {
@@ -31,6 +31,12 @@ interface UseCommentsReturn {
   updateComment: (commentId: number, text: string) => Promise<Comment | null>;
   /** Delete a comment */
   deleteComment: (commentId: number) => Promise<boolean>;
+  /** Toggle a reaction on a comment */
+  toggleReaction: (
+    commentId: number,
+    reactionType: CommentReactionType,
+    currentUserId: string
+  ) => Promise<void>;
 }
 
 /**
@@ -174,6 +180,36 @@ export function useComments({
     [discussionId]
   );
 
+  // Toggle reaction
+  const toggleReaction = useCallback(
+    async (
+      commentId: number,
+      reactionType: CommentReactionType,
+      currentUserId: string
+    ): Promise<void> => {
+      setError(null);
+
+      try {
+        const updatedComment = await commentService.toggleReaction(
+          discussionId,
+          commentId,
+          reactionType,
+          currentUserId
+        );
+        // Update the comment in state with new reactions
+        setComments((prev) =>
+          prev.map((c) => (c.id === commentId ? updatedComment : c))
+        );
+      } catch (err) {
+        console.error('[useComments] Error toggling reaction:', err);
+        setError(
+          err instanceof Error ? err.message : 'Failed to toggle reaction'
+        );
+      }
+    },
+    [discussionId]
+  );
+
   return {
     comments,
     isLoading,
@@ -183,6 +219,7 @@ export function useComments({
     addComment,
     updateComment,
     deleteComment,
+    toggleReaction,
   };
 }
 

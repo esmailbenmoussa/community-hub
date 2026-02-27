@@ -1,10 +1,10 @@
 {
   "manifestVersion": 1,
   "id": "community-hub",
-  "publisher": "Esmail-BenMoussa",
+  "publisher": "Repryl",
   "version": "0.1.6",
   "name": "Community Hub",
-  "description": "A GitHub Discussions-like collaborative discussion platform for Azure DevOps. Create announcements, gather feedback, and build community around your projects.",
+  "description": "Community Hub is the home for team conversations in Azure DevOps. Ask questions, share announcements, upvote ideas, and comment—right next to your work. Enable productive collaboration.",
   "public": false,
   "categories": ["Azure Boards"],
   "tags": [
@@ -12,7 +12,17 @@
     "community",
     "announcements",
     "collaboration",
-    "feedback"
+    "feedback",
+    "communication",
+    "team",
+    "comments",
+    "voting",
+    "markdown",
+    "labels",
+    "forum",
+    "Q&A",
+    "knowledge-sharing",
+    "pinning"
   ],
   "targets": [
     {

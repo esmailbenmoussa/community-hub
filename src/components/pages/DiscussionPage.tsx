@@ -8,6 +8,7 @@ import { useDiscussion } from '@/hooks/useDiscussion';
 import { useComments } from '@/hooks/useComments';
 import { useAzureDevOps } from '@/hooks/useAzureDevOps';
 import { DiscussionDetail } from '@/components/organisms/DiscussionDetail';
+import { CommentReactionType } from '@/types';
 
 export function DiscussionPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +36,7 @@ export function DiscussionPage() {
     addComment,
     updateComment,
     deleteComment,
+    toggleReaction,
   } = useComments({
     discussionId,
     autoFetch: discussionId > 0,
@@ -54,6 +56,15 @@ export function DiscussionPage() {
 
   const handleDeleteComment = async (commentId: number) => {
     await deleteComment(commentId);
+  };
+
+  const handleToggleReaction = (
+    commentId: number,
+    type: CommentReactionType
+  ) => {
+    if (user) {
+      toggleReaction(commentId, type, user.id);
+    }
   };
 
   // Error state
@@ -146,6 +157,7 @@ export function DiscussionPage() {
           onAddComment={handleAddComment}
           onEditComment={handleEditComment}
           onDeleteComment={handleDeleteComment}
+          onToggleReaction={handleToggleReaction}
           isLoading={discussionLoading}
           commentsLoading={commentsLoading}
           commentActionPending={commentSubmitting}

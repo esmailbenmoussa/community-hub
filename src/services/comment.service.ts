@@ -3,7 +3,13 @@
  * Handles CRUD operations for discussion comments using Azure DevOps Work Item Comments API.
  */
 
-import { Comment, CreateCommentInput, UpdateCommentInput, User } from '@/types';
+import {
+  Comment,
+  CommentReactionType,
+  CreateCommentInput,
+  UpdateCommentInput,
+  User,
+} from '@/types';
 import type { WorkItem } from 'azure-devops-extension-api/WorkItemTracking';
 import { isDevMode } from '@/utils/environment';
 import {
@@ -62,8 +68,22 @@ async function getWorkItemTrackingClient() {
  * Mock comments storage for dev mode
  */
 const mockCommentsMap: Map<number, Comment[]> = new Map();
+
+/**
+ * Mock reactions storage for dev mode
+ * Key: `${commentId}-${userId}` -> array of reaction types
+ */
+const mockUserReactionsMap: Map<string, Set<CommentReactionType>> = new Map();
+
 let nextCommentId = 100;
 let mockDataInitialized = false;
+
+/**
+ * Helper to get user reaction key
+ */
+function getUserReactionKey(commentId: number, userId: string): string {
+  return `${commentId}-${userId}`;
+}
 
 /**
  * Helper to create a date N days ago
@@ -88,6 +108,26 @@ function initAllMockComments(): void {
       createdDate: daysAgo(25),
       workItemId: 1,
       version: 1,
+      reactions: [
+        {
+          commentId: 100,
+          type: CommentReactionType.Like,
+          count: 8,
+          isCurrentUserEngaged: true,
+        },
+        {
+          commentId: 100,
+          type: CommentReactionType.Heart,
+          count: 3,
+          isCurrentUserEngaged: false,
+        },
+        {
+          commentId: 100,
+          type: CommentReactionType.Hooray,
+          count: 5,
+          isCurrentUserEngaged: false,
+        },
+      ],
     },
     {
       id: nextCommentId++,
@@ -96,6 +136,14 @@ function initAllMockComments(): void {
       createdDate: daysAgo(24),
       workItemId: 1,
       version: 1,
+      reactions: [
+        {
+          commentId: 101,
+          type: CommentReactionType.Like,
+          count: 4,
+          isCurrentUserEngaged: false,
+        },
+      ],
     },
     {
       id: nextCommentId++,
@@ -104,6 +152,20 @@ function initAllMockComments(): void {
       createdDate: daysAgo(23),
       workItemId: 1,
       version: 1,
+      reactions: [
+        {
+          commentId: 102,
+          type: CommentReactionType.Like,
+          count: 2,
+          isCurrentUserEngaged: false,
+        },
+        {
+          commentId: 102,
+          type: CommentReactionType.Smile,
+          count: 1,
+          isCurrentUserEngaged: true,
+        },
+      ],
     },
     {
       id: nextCommentId++,
@@ -1749,6 +1811,164 @@ export class CommentService {
         '[CommentService] Error getting all recent comments:',
         error
       );
+      throw error;
+    }
+  }
+
+  /**
+   * Toggle a reaction on a comment (add if not present, remove if present)
+   * Returns the updated comment with reactions
+   */
+  async toggleReaction(
+    discussionId: number,
+    commentId: number,
+    reactionType: CommentReactionType,
+    currentUserId: string
+  ): Promise<Comment> {
+    this.ensureInitialized();
+
+    if (isDevMode()) {
+      const comments = initMockComments(discussionId);
+      const comment = comments.find((c) => c.id === commentId);
+      if (!comment) {
+        throw new Error('Comment not found');
+      }
+
+      // Track user reactions
+      const userKey = getUserReactionKey(commentId, currentUserId);
+      if (!mockUserReactionsMap.has(userKey)) {
+        mockUserReactionsMap.set(userKey, new Set());
+      }
+      const userReactions = mockUserReactionsMap.get(userKey)!;
+
+      // Initialize reactions array if not present
+      if (!comment.reactions) {
+        comment.reactions = [];
+      }
+
+      // Find existing reaction of this type
+      const reaction = comment.reactions.find((r) => r.type === reactionType);
+      const hasUserReacted = userReactions.has(reactionType);
+
+      if (hasUserReacted) {
+        // Remove reaction
+        userReactions.delete(reactionType);
+        if (reaction) {
+          reaction.count--;
+          reaction.isCurrentUserEngaged = false;
+          // Remove if count is 0
+          if (reaction.count <= 0) {
+            comment.reactions = comment.reactions.filter(
+              (r) => r.type !== reactionType
+            );
+          }
+        }
+      } else {
+        // Add reaction
+        userReactions.add(reactionType);
+        if (reaction) {
+          reaction.count++;
+          reaction.isCurrentUserEngaged = true;
+        } else {
+          // Create new reaction
+          comment.reactions.push({
+            commentId,
+            type: reactionType,
+            count: 1,
+            isCurrentUserEngaged: true,
+          });
+        }
+      }
+
+      return { ...comment };
+    }
+
+    // Production: Use Azure DevOps API
+    try {
+      // Check if user already has this reaction
+      const comment = await this.getComment(discussionId, commentId);
+      if (!comment) {
+        throw new Error('Comment not found');
+      }
+
+      const existingReaction = comment.reactions?.find(
+        (r) => r.type === reactionType && r.isCurrentUserEngaged
+      );
+
+      if (existingReaction) {
+        // Remove reaction
+        await this.removeReaction(discussionId, commentId, reactionType);
+      } else {
+        // Add reaction
+        await this.addReaction(discussionId, commentId, reactionType);
+      }
+
+      // Fetch updated comment
+      const updatedComment = await this.getComment(discussionId, commentId);
+      if (!updatedComment) {
+        throw new Error('Failed to fetch updated comment');
+      }
+      return updatedComment;
+    } catch (error) {
+      console.error('[CommentService] Error toggling reaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a reaction to a comment
+   */
+  async addReaction(
+    discussionId: number,
+    commentId: number,
+    reactionType: CommentReactionType
+  ): Promise<void> {
+    this.ensureInitialized();
+
+    if (isDevMode()) {
+      // Dev mode handled in toggleReaction
+      return;
+    }
+
+    try {
+      // Azure DevOps API: PUT /_apis/wit/workItems/{id}/comments/{commentId}/reactions/{type}
+      await this.workItemClient.addCommentReaction(
+        undefined, // project
+        discussionId,
+        commentId,
+        reactionType
+      );
+    } catch (error) {
+      console.error('[CommentService] Error adding reaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a reaction from a comment
+   */
+  async removeReaction(
+    discussionId: number,
+    commentId: number,
+    reactionType: CommentReactionType
+  ): Promise<void> {
+    this.ensureInitialized();
+
+    if (isDevMode()) {
+      // Dev mode handled in toggleReaction
+      return;
+    }
+
+    try {
+      // Azure DevOps API: DELETE /_apis/wit/workItems/{id}/comments/{commentId}/reactions/{type}
+      await this.workItemClient.deleteCommentReaction(
+        undefined, // project
+        discussionId,
+        commentId,
+        reactionType
+      );
+    } catch (error) {
+      console.error('[CommentService] Error removing reaction:', error);
       throw error;
     }
   }

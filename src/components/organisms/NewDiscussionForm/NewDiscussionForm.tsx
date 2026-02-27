@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { Category, VisibilityScope, CreateDiscussionInput } from '@/types';
 import { Select, SelectOption } from '@/components/atoms/Select';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
+import { MarkdownEditor } from '@/components/molecules/MarkdownEditor';
 
 interface NewDiscussionFormProps {
   /** Callback when form is submitted */
@@ -158,25 +159,18 @@ export function NewDiscussionForm({
         >
           Body
         </label>
-        <textarea
+        <MarkdownEditor
           id="body"
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={setBody}
           disabled={isSubmitting}
-          placeholder="Write your discussion content here... (Markdown supported)"
+          placeholder="Write your discussion content here..."
           rows={10}
-          className={`w-full resize-none rounded-ado border bg-surface px-3 py-2 text-content placeholder:text-content-disabled focus:outline-none focus:ring-1 ${
-            errors.body
-              ? 'border-state-error focus:border-state-error focus:ring-state-error'
-              : 'border-border focus:border-accent focus:ring-accent'
-          }`}
+          hasError={!!errors.body}
         />
         {errors.body && (
           <p className="mt-1 text-xs text-state-error">{errors.body}</p>
         )}
-        <p className="mt-1 text-xs text-content-disabled">
-          Markdown is supported for formatting.
-        </p>
       </div>
 
       {/* Visibility */}

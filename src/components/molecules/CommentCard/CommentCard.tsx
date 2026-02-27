@@ -5,9 +5,11 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Comment, User } from '@/types';
+import { Comment, CommentReactionType, User } from '@/types';
 import { Avatar } from '@/components/atoms/Avatar';
 import { TimeAgo } from '@/components/atoms/TimeAgo';
+import { MarkdownRenderer } from '@/components/atoms/MarkdownRenderer';
+import { ReactionBar } from '@/components/molecules/ReactionBar';
 
 interface CommentCardProps {
   /** The comment to display */
@@ -18,6 +20,8 @@ interface CommentCardProps {
   onEdit?: (commentId: number, newText: string) => Promise<void>;
   /** Callback when delete is clicked */
   onDelete?: (commentId: number) => Promise<void>;
+  /** Callback when a reaction is toggled */
+  onToggleReaction?: (commentId: number, type: CommentReactionType) => void;
   /** Whether actions are disabled */
   actionsDisabled?: boolean;
 }
@@ -30,6 +34,7 @@ export function CommentCard({
   currentUser,
   onEdit,
   onDelete,
+  onToggleReaction,
   actionsDisabled = false,
 }: CommentCardProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -141,9 +146,17 @@ export function CommentCard({
             </div>
           </div>
         ) : (
-          <div className="whitespace-pre-wrap break-words text-sm text-content">
-            {comment.text}
-          </div>
+          <MarkdownRenderer content={comment.text} className="text-sm" />
+        )}
+
+        {/* Reactions */}
+        {!isEditing && (
+          <ReactionBar
+            reactions={comment.reactions}
+            onToggleReaction={(type) => onToggleReaction?.(comment.id, type)}
+            disabled={actionsDisabled}
+            className="mt-2"
+          />
         )}
 
         {/* Actions */}

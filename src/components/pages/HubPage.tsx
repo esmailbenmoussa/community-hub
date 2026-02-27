@@ -289,7 +289,7 @@ export function HubPage() {
                   value={filters.sort}
                   onChange={handleSortChange}
                   placeholder="Sort by"
-                  className="w-36"
+                  className="w-40"
                 />
               </div>
               <div className="flex items-center gap-2">

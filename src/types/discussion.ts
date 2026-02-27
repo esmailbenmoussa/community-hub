@@ -117,6 +117,31 @@ export interface Discussion {
 }
 
 /**
+ * Comment reaction types supported by Azure DevOps
+ */
+export enum CommentReactionType {
+  Like = 'like',
+  Heart = 'heart',
+  Hooray = 'hooray',
+  Smile = 'smile',
+  Confused = 'confused',
+}
+
+/**
+ * Reaction on a comment
+ */
+export interface CommentReaction {
+  /** Comment ID this reaction belongs to */
+  commentId: number;
+  /** Type of reaction */
+  type: CommentReactionType;
+  /** Total count of this reaction type */
+  count: number;
+  /** Whether the current user has this reaction */
+  isCurrentUserEngaged: boolean;
+}
+
+/**
  * Discussion comment (from Work Item Comments API)
  */
 export interface Comment {
@@ -134,6 +159,8 @@ export interface Comment {
   workItemId: number;
   /** Version number */
   version: number;
+  /** Reactions on this comment */
+  reactions?: CommentReaction[];
 }
 
 /**
