@@ -21,6 +21,7 @@ import {
   parseCategory,
   parseVisibility,
   parseJsonArray,
+  parseTagString,
 } from '@/utils/wiql';
 import {
   mockDiscussions,
@@ -162,8 +163,8 @@ export class DiscussionService {
       },
       {
         op: 'add',
-        path: `/fields/${DISCUSSION_FIELDS.Labels}`,
-        value: JSON.stringify(input.labels || []),
+        path: '/fields/System.Tags',
+        value: (input.tags || []).join('; '),
       },
     ];
 
@@ -267,11 +268,11 @@ export class DiscussionService {
       });
     }
 
-    if (updates.labels !== undefined) {
+    if (updates.tags !== undefined) {
       patchDocument.push({
         op: 'replace',
-        path: `/fields/${DISCUSSION_FIELDS.Labels}`,
-        value: JSON.stringify(updates.labels),
+        path: '/fields/System.Tags',
+        value: updates.tags.join('; '),
       });
     }
 
@@ -422,10 +423,71 @@ export class DiscussionService {
   }
 
   /**
-   * Set labels for a discussion
+   * Set tags for a discussion
    */
-  async setLabels(id: number, labels: string[]): Promise<Discussion> {
-    return this.update(id, { labels });
+  async setTags(id: number, tags: string[]): Promise<Discussion> {
+    return this.update(id, { tags });
+  }
+
+  /**
+   * Get all unique tags used across discussions in the project
+   */
+  async getAllTags(): Promise<string[]> {
+    this.ensureInitialized();
+
+    if (isDevMode()) {
+      // Aggregate from mock data
+      const allTags = mockDiscussions.flatMap((d) => d.tags);
+      return [...new Set(allTags)].sort();
+    }
+
+    if (!this.projectId || !this.projectName) {
+      throw new Error('Project context not available');
+    }
+
+    try {
+      // Query discussions that have tags
+      const wiql = `
+        SELECT [System.Id], [System.Tags]
+        FROM WorkItems
+        WHERE [System.WorkItemType] = '${DISCUSSION_WORK_ITEM_TYPE}'
+          AND [System.State] <> 'Removed'
+          AND [System.Tags] <> ''
+      `;
+
+      const queryResult: WorkItemQueryResult =
+        await this.workItemClient.queryByWiql(
+          { query: wiql },
+          this.projectName
+        );
+
+      const workItemIds = queryResult.workItems?.map((wi) => wi.id) || [];
+
+      if (workItemIds.length === 0) {
+        return [];
+      }
+
+      // Fetch work items in batches (ADO limits to 200 per request)
+      const BATCH_SIZE = 200;
+      const allTags = new Set<string>();
+
+      for (let i = 0; i < workItemIds.length; i += BATCH_SIZE) {
+        const batchIds = workItemIds.slice(i, i + BATCH_SIZE);
+        const workItems = await this.workItemClient.getWorkItems(batchIds, [
+          'System.Tags',
+        ]);
+
+        for (const wi of workItems) {
+          const tags = parseTagString(wi.fields?.['System.Tags'] as string);
+          tags.forEach((tag) => allTags.add(tag));
+        }
+      }
+
+      return [...allTags].sort();
+    } catch (error) {
+      console.error('[DiscussionService] Error fetching tags:', error);
+      return []; // Return empty on error, don't break the form
+    }
   }
 
   /**
@@ -542,7 +604,7 @@ export class DiscussionService {
       voteCount: (fields[DISCUSSION_FIELDS.VoteCount] as number) || 0,
       commentCount: (fields['System.CommentCount'] as number) || 0,
       isPinned: (fields[DISCUSSION_FIELDS.IsPinned] as boolean) || false,
-      labels: parseJsonArray(fields[DISCUSSION_FIELDS.Labels] as string),
+      tags: parseTagString(fields['System.Tags'] as string),
       author,
       createdDate: new Date(fields['System.CreatedDate'] as string),
       changedDate: new Date(fields['System.ChangedDate'] as string),
@@ -575,9 +637,9 @@ export class DiscussionService {
       );
     }
 
-    if (options.filters?.labels && options.filters.labels.length > 0) {
+    if (options.filters?.tags && options.filters.tags.length > 0) {
       filtered = filtered.filter((d) =>
-        options.filters!.labels!.some((label) => d.labels.includes(label))
+        options.filters!.tags!.some((tag) => d.tags.includes(tag))
       );
     }
 

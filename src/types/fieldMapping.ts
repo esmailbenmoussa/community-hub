@@ -29,8 +29,6 @@ export enum FieldPurpose {
   VoteCount = 'VoteCount',
   /** Whether the discussion is pinned to the top */
   IsPinned = 'IsPinned',
-  /** JSON array of label names assigned to the discussion */
-  Labels = 'Labels',
 }
 
 /**
@@ -42,7 +40,6 @@ export const ALL_FIELD_PURPOSES: FieldPurpose[] = [
   FieldPurpose.TargetProjects,
   FieldPurpose.VoteCount,
   FieldPurpose.IsPinned,
-  FieldPurpose.Labels,
 ];
 
 /**
@@ -141,13 +138,6 @@ export const FIELD_REQUIREMENTS: Record<FieldPurpose, FieldRequirement> = {
     expectedTypes: ['boolean'],
     isRequired: false,
   },
-  [FieldPurpose.Labels]: {
-    purpose: FieldPurpose.Labels,
-    displayName: 'Labels',
-    description: 'JSON array of label names assigned to the discussion',
-    expectedTypes: ['string', 'html', 'plainText'],
-    isRequired: false,
-  },
 };
 
 // ============================================
@@ -171,7 +161,6 @@ export const DEFAULT_FIELD_PATTERNS: Record<FieldPurpose, string[]> = {
   ],
   [FieldPurpose.VoteCount]: ['Custom.VoteCount', 'Custom.Votes'],
   [FieldPurpose.IsPinned]: ['Custom.IsPinned', 'Custom.Pinned'],
-  [FieldPurpose.Labels]: ['Custom.Labels', 'Custom.DiscussionLabels'],
 };
 
 // ============================================

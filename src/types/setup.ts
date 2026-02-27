@@ -177,13 +177,6 @@ export const REQUIRED_DISCUSSION_FIELDS: RequiredFieldDefinition[] = [
     isRequired: false,
     description: 'Whether the discussion is pinned to the top',
   },
-  {
-    referenceName: 'Custom.Labels',
-    displayName: 'Labels',
-    expectedType: ['string', 'html', 'plainText'],
-    isRequired: false,
-    description: 'JSON array of label names assigned to the discussion',
-  },
 ];
 
 // ============================================
@@ -235,8 +228,6 @@ export interface StoredSetupStatus {
 export const EDS_COLLECTIONS = {
   /** Project-scoped setup status */
   SetupStatus: 'community-hub-setup',
-  /** Project-scoped labels */
-  Labels: 'community-hub-labels',
   /** User-scoped votes */
   UserVotes: 'community-hub-votes',
   /** User-scoped preferences */

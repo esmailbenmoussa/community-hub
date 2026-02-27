@@ -7,7 +7,6 @@ import { validationService } from './validation.service';
 import { discussionService } from './discussion.service';
 import { commentService } from './comment.service';
 import { voteService } from './vote.service';
-import { labelService } from './label.service';
 import { fieldMappingService } from './fieldMapping.service';
 
 // Validation Service
@@ -21,9 +20,6 @@ export { CommentService, commentService } from './comment.service';
 
 // Vote Service
 export { VoteService, voteService } from './vote.service';
-
-// Label Service
-export { LabelService, labelService } from './label.service';
 
 // Field Mapping Service
 export {
@@ -42,7 +38,6 @@ export async function initializeServices(): Promise<void> {
     discussionService.initialize(),
     commentService.initialize(),
     voteService.initialize(),
-    labelService.initialize(),
     fieldMappingService.initialize(),
   ]);
 

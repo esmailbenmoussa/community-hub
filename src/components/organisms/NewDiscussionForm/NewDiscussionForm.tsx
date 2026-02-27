@@ -9,6 +9,8 @@ import { Category, VisibilityScope, CreateDiscussionInput } from '@/types';
 import { Select, SelectOption } from '@/components/atoms/Select';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
 import { MarkdownEditor } from '@/components/molecules/MarkdownEditor';
+import { TagInput } from '@/components/molecules/TagInput';
+import { useTags } from '@/hooks/useTags';
 
 interface NewDiscussionFormProps {
   /** Callback when form is submitted */
@@ -36,7 +38,11 @@ export function NewDiscussionForm({
   const [visibility, setVisibility] = useState<VisibilityScope>(
     VisibilityScope.Project
   );
+  const [tags, setTags] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch available tags for autocomplete
+  const { availableTags, isLoading: tagsLoading } = useTags();
 
   // Category options (MVP: only Announcements)
   const categoryOptions: SelectOption[] = [
@@ -80,6 +86,7 @@ export function NewDiscussionForm({
       body: body.trim(),
       category,
       visibility,
+      tags: tags.length > 0 ? tags : undefined,
     };
 
     await onSubmit(input);
@@ -190,6 +197,28 @@ export function NewDiscussionForm({
           {visibility === VisibilityScope.Project
             ? 'Only members of this project can see this discussion.'
             : 'All members of the organization can see this discussion.'}
+        </p>
+      </div>
+
+      {/* Tags */}
+      <div className="mb-6">
+        <label className="mb-2 block text-sm font-medium text-content">
+          Tags
+          <span className="ml-1 font-normal text-content-disabled">
+            (optional, max 5)
+          </span>
+        </label>
+        <TagInput
+          tags={tags}
+          onChange={setTags}
+          availableTags={availableTags}
+          maxTags={5}
+          disabled={isSubmitting}
+          placeholder="Add tags..."
+          isLoading={tagsLoading}
+        />
+        <p className="mt-1 text-xs text-content-disabled">
+          Add tags to help categorize and find this discussion.
         </p>
       </div>
 

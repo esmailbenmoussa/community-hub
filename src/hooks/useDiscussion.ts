@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Discussion } from '@/types';
+import { Discussion, UpdateDiscussionInput } from '@/types';
 import { discussionService } from '@/services/discussion.service';
 import { voteService } from '@/services/vote.service';
 
@@ -22,12 +22,16 @@ interface UseDiscussionReturn {
   hasVoted: boolean;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Whether an update is in progress */
+  isUpdating: boolean;
   /** Error message if any */
   error: string | null;
   /** Fetch/refresh discussion */
   refresh: () => Promise<void>;
   /** Toggle vote on the discussion */
   toggleVote: () => Promise<void>;
+  /** Update the discussion */
+  updateDiscussion: (updates: UpdateDiscussionInput) => Promise<boolean>;
 }
 
 /**
@@ -40,6 +44,7 @@ export function useDiscussion({
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -125,13 +130,40 @@ export function useDiscussion({
     }
   }, [discussion, hasVoted, discussionId]);
 
+  // Update discussion
+  const updateDiscussion = useCallback(
+    async (updates: UpdateDiscussionInput): Promise<boolean> => {
+      if (!discussion) return false;
+
+      setIsUpdating(true);
+      setError(null);
+
+      try {
+        const updated = await discussionService.update(discussionId, updates);
+        setDiscussion(updated);
+        return true;
+      } catch (err) {
+        console.error('[useDiscussion] Error updating discussion:', err);
+        setError(
+          err instanceof Error ? err.message : 'Failed to update discussion'
+        );
+        return false;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [discussion, discussionId]
+  );
+
   return {
     discussion,
     hasVoted,
     isLoading,
+    isUpdating,
     error,
     refresh,
     toggleVote,
+    updateDiscussion,
   };
 }
 

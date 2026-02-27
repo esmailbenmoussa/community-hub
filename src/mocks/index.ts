@@ -86,11 +86,6 @@ export const mockDiscussionFields = [
     referenceName: 'Custom.IsPinned',
     type: 'boolean',
   },
-  {
-    name: 'Labels',
-    referenceName: 'Custom.Labels',
-    type: 'html',
-  },
 ];
 
 /**
@@ -139,13 +134,6 @@ export const mockAvailableFields: DiscoveredField[] = [
     type: 'boolean' as FieldType,
     isPicklist: false,
     description: 'Whether discussion is pinned',
-  },
-  {
-    name: 'Labels',
-    referenceName: 'Custom.Labels',
-    type: 'html' as FieldType,
-    isPicklist: false,
-    description: 'JSON array of label names',
   },
   // Additional fields that won't auto-match (for testing manual selection)
   {

@@ -1,6 +1,6 @@
 /**
  * Community Hub Discussion Types
- * Type definitions for discussions, comments, votes, and labels
+ * Type definitions for discussions, comments, votes, and tags
  */
 
 // ============================================
@@ -44,7 +44,6 @@ export const DISCUSSION_FIELDS = {
   TargetProjects: 'Custom.TargetProjects',
   VoteCount: 'Custom.VoteCount',
   IsPinned: 'Custom.IsPinned',
-  Labels: 'Custom.Labels',
 } as const;
 
 /**
@@ -64,16 +63,6 @@ export interface User {
   displayName: string;
   imageUrl?: string;
   uniqueName?: string;
-}
-
-/**
- * Label for organizing discussions
- */
-export interface Label {
-  id: string;
-  name: string;
-  color: string;
-  description?: string;
 }
 
 /**
@@ -98,8 +87,8 @@ export interface Discussion {
   commentCount: number;
   /** Whether discussion is pinned */
   isPinned: boolean;
-  /** Assigned labels */
-  labels: string[];
+  /** Assigned tags (using native ADO System.Tags) */
+  tags: string[];
   /** Author information */
   author: User;
   /** Creation date */
@@ -196,7 +185,7 @@ export interface CreateDiscussionInput {
   category: Category;
   visibility: VisibilityScope;
   targetProjects?: string[];
-  labels?: string[];
+  tags?: string[];
 }
 
 /**
@@ -207,7 +196,7 @@ export interface UpdateDiscussionInput {
   body?: string;
   visibility?: VisibilityScope;
   targetProjects?: string[];
-  labels?: string[];
+  tags?: string[];
   isPinned?: boolean;
 }
 
@@ -225,24 +214,6 @@ export interface UpdateCommentInput {
   text: string;
 }
 
-/**
- * Input for creating a label
- */
-export interface CreateLabelInput {
-  name: string;
-  color: string;
-  description?: string;
-}
-
-/**
- * Input for updating a label
- */
-export interface UpdateLabelInput {
-  name?: string;
-  color?: string;
-  description?: string;
-}
-
 // ============================================
 // List/Query Types
 // ============================================
@@ -252,7 +223,7 @@ export interface UpdateLabelInput {
  */
 export interface DiscussionFilters {
   category?: Category;
-  labels?: string[];
+  tags?: string[];
   visibility?: VisibilityScope;
   projectId?: string;
   searchTitle?: string;
@@ -296,10 +267,10 @@ export interface DiscussionFieldValues {
   'System.ChangedDate': string;
   'System.State': string;
   'System.TeamProject': string;
+  'System.Tags': string;
   [DISCUSSION_FIELDS.Category]: string;
   [DISCUSSION_FIELDS.Visibility]: string;
   [DISCUSSION_FIELDS.TargetProjects]: string;
   [DISCUSSION_FIELDS.VoteCount]: number;
   [DISCUSSION_FIELDS.IsPinned]: boolean;
-  [DISCUSSION_FIELDS.Labels]: string;
 }

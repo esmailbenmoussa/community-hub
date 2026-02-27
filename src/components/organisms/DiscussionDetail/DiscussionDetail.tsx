@@ -5,7 +5,14 @@
 
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Discussion, Comment, CommentReactionType, User } from '@/types';
+import {
+  Discussion,
+  Comment,
+  CommentReactionType,
+  User,
+  UpdateDiscussionInput,
+  VisibilityScope,
+} from '@/types';
 import { Avatar } from '@/components/atoms/Avatar';
 import { TimeAgo } from '@/components/atoms/TimeAgo';
 import { VoteButton } from '@/components/atoms/VoteButton';
@@ -14,12 +21,18 @@ import { MarkdownRenderer } from '@/components/atoms/MarkdownRenderer';
 import { Select } from '@/components/atoms/Select';
 import { CommentCard } from '@/components/molecules/CommentCard';
 import { CommentForm } from '@/components/molecules/CommentForm';
+import { MarkdownEditor } from '@/components/molecules/MarkdownEditor';
 
 type CommentSortOrder = 'newest' | 'oldest';
 
 const COMMENT_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'oldest', label: 'Oldest' },
+];
+
+const VISIBILITY_OPTIONS = [
+  { value: VisibilityScope.Project, label: 'This project only' },
+  { value: VisibilityScope.Organization, label: 'Entire organization' },
 ];
 
 interface DiscussionDetailProps {
@@ -43,6 +56,8 @@ interface DiscussionDetailProps {
   onDeleteComment?: (commentId: number) => Promise<void>;
   /** Callback when a reaction is toggled on a comment */
   onToggleReaction?: (commentId: number, type: CommentReactionType) => void;
+  /** Callback when the discussion is edited */
+  onEditDiscussion?: (updates: UpdateDiscussionInput) => Promise<boolean>;
   /** Whether discussion is loading */
   isLoading?: boolean;
   /** Whether comments are loading */
@@ -51,6 +66,8 @@ interface DiscussionDetailProps {
   commentActionPending?: boolean;
   /** Whether voting is disabled */
   voteDisabled?: boolean;
+  /** Whether a discussion update is in progress */
+  discussionUpdating?: boolean;
 }
 
 /**
@@ -140,13 +157,147 @@ export function DiscussionDetail({
   onEditComment,
   onDeleteComment,
   onToggleReaction,
+  onEditDiscussion,
   isLoading = false,
   commentsLoading = false,
   commentActionPending = false,
   voteDisabled = false,
+  discussionUpdating = false,
 }: DiscussionDetailProps) {
   // Comment sort state
   const [commentSort, setCommentSort] = useState<CommentSortOrder>('newest');
+
+  // Edit discussion state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(discussion.title);
+  const [editBody, setEditBody] = useState(discussion.body);
+  const [editVisibility, setEditVisibility] = useState<VisibilityScope>(
+    discussion.visibility
+  );
+  const [editTags, setEditTags] = useState<string[]>(discussion.tags);
+  const [newTag, setNewTag] = useState('');
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  // Authorization check
+  const isAuthor = currentUser?.id === discussion.author.id;
+  const canEdit = isAuthor && onEditDiscussion;
+
+  // Check if discussion was edited
+  const wasEdited =
+    discussion.changedDate &&
+    new Date(discussion.changedDate).getTime() >
+      new Date(discussion.createdDate).getTime() + 1000; // 1 second tolerance
+
+  // Reset edit state when discussion changes
+  const resetEditState = () => {
+    setEditTitle(discussion.title);
+    setEditBody(discussion.body);
+    setEditVisibility(discussion.visibility);
+    setEditTags(discussion.tags);
+    setNewTag('');
+    setEditErrors({});
+  };
+
+  // Start editing
+  const handleStartEdit = () => {
+    resetEditState();
+    setIsEditing(true);
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    resetEditState();
+  };
+
+  // Validate edit form
+  const validateEdit = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!editTitle.trim()) {
+      errors.title = 'Title is required';
+    } else if (editTitle.length < 5) {
+      errors.title = 'Title must be at least 5 characters';
+    } else if (editTitle.length > 200) {
+      errors.title = 'Title must be less than 200 characters';
+    }
+
+    if (!editBody.trim()) {
+      errors.body = 'Body is required';
+    } else if (editBody.length < 10) {
+      errors.body = 'Body must be at least 10 characters';
+    }
+
+    setEditErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Submit edit
+  const handleSubmitEdit = async () => {
+    if (!onEditDiscussion || !validateEdit()) return;
+
+    const updates: UpdateDiscussionInput = {};
+
+    // Only include changed fields
+    if (editTitle.trim() !== discussion.title) {
+      updates.title = editTitle.trim();
+    }
+    if (editBody.trim() !== discussion.body) {
+      updates.body = editBody.trim();
+    }
+    if (editVisibility !== discussion.visibility) {
+      updates.visibility = editVisibility;
+    }
+    if (JSON.stringify(editTags) !== JSON.stringify(discussion.tags)) {
+      updates.tags = editTags;
+    }
+
+    // If no changes, just close edit mode
+    if (Object.keys(updates).length === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    const success = await onEditDiscussion(updates);
+    if (success) {
+      setIsEditing(false);
+    }
+  };
+
+  // Handle keyboard shortcuts in edit mode
+  const handleEditKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    if (e.key === 'Escape') {
+      handleCancelEdit();
+    } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      handleSubmitEdit();
+    }
+  };
+
+  // Add a tag
+  const handleAddTag = () => {
+    const trimmed = newTag.trim().toLowerCase();
+    if (trimmed && !editTags.includes(trimmed)) {
+      setEditTags([...editTags, trimmed]);
+      setNewTag('');
+    }
+  };
+
+  // Remove a tag
+  const handleRemoveTag = (tag: string) => {
+    setEditTags(editTags.filter((t) => t !== tag));
+  };
+
+  // Handle tag input keydown
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
 
   // Get unique participants (author + commenters)
   const participants = useMemo(() => {
@@ -230,10 +381,34 @@ export function DiscussionDetail({
               <CategoryBadge category={discussion.category} size="sm" />
             </div>
 
-            {/* Title */}
-            <h1 className="mb-4 text-2xl font-bold text-content">
-              {discussion.title}
-            </h1>
+            {/* Title - editable or static */}
+            {isEditing ? (
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  disabled={discussionUpdating}
+                  placeholder="Discussion title..."
+                  className={`w-full rounded-ado border bg-surface px-3 py-2 text-xl font-bold text-content placeholder:text-content-disabled focus:outline-none focus:ring-1 ${
+                    editErrors.title
+                      ? 'border-state-error focus:border-state-error focus:ring-state-error'
+                      : 'border-border focus:border-accent focus:ring-accent'
+                  }`}
+                  autoFocus
+                />
+                {editErrors.title && (
+                  <p className="mt-1 text-xs text-state-error">
+                    {editErrors.title}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <h1 className="mb-4 text-2xl font-bold text-content">
+                {discussion.title}
+              </h1>
+            )}
 
             {/* Meta info */}
             <div className="flex items-center gap-4">
@@ -245,33 +420,173 @@ export function DiscussionDetail({
                   </span>
                   <span className="mx-2 text-content-secondary">·</span>
                   <TimeAgo date={discussion.createdDate} className="text-sm" />
+                  {wasEdited && (
+                    <span className="ml-1 text-xs text-content-disabled">
+                      (edited)
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Vote button */}
-              <VoteButton
-                count={discussion.voteCount}
-                hasVoted={hasVoted}
-                onVote={onVote}
-                disabled={voteDisabled}
-              />
+              {/* Vote button - hide in edit mode */}
+              {!isEditing && (
+                <VoteButton
+                  count={discussion.voteCount}
+                  hasVoted={hasVoted}
+                  onVote={onVote}
+                  disabled={voteDisabled}
+                />
+              )}
+
+              {/* Edit button - only for author */}
+              {canEdit && !isEditing && (
+                <button
+                  onClick={handleStartEdit}
+                  className="text-sm text-content-secondary transition-colors hover:text-content"
+                >
+                  Edit
+                </button>
+              )}
             </div>
           </div>
 
           {/* Discussion body */}
           <div className="mb-8 border-b border-border pb-8">
-            <MarkdownRenderer content={discussion.body} />
+            {isEditing ? (
+              <div className="space-y-4">
+                {/* Body editor */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-content">
+                    Body
+                  </label>
+                  <MarkdownEditor
+                    value={editBody}
+                    onChange={setEditBody}
+                    disabled={discussionUpdating}
+                    placeholder="Write your discussion content here..."
+                    rows={10}
+                    hasError={!!editErrors.body}
+                  />
+                  {editErrors.body && (
+                    <p className="mt-1 text-xs text-state-error">
+                      {editErrors.body}
+                    </p>
+                  )}
+                </div>
+
+                {/* Visibility */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-content">
+                    Visibility
+                  </label>
+                  <div className="w-64">
+                    <Select
+                      options={VISIBILITY_OPTIONS}
+                      value={editVisibility}
+                      onChange={(e) =>
+                        setEditVisibility(e.target.value as VisibilityScope)
+                      }
+                      disabled={discussionUpdating}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-content-disabled">
+                    {editVisibility === VisibilityScope.Project
+                      ? 'Only members of this project can see this discussion.'
+                      : 'All members of the organization can see this discussion.'}
+                  </p>
+                </div>
+
+                {/* Tags editor */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-content">
+                    Tags
+                  </label>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {editTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="flex items-center gap-1 rounded-full border border-border bg-surface-secondary px-2 py-0.5 text-xs text-content-secondary"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          disabled={discussionUpdating}
+                          className="ml-0.5 text-content-disabled hover:text-state-error"
+                        >
+                          <svg
+                            className="h-3 w-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      disabled={discussionUpdating}
+                      placeholder="Add a tag..."
+                      className="flex-1 rounded-ado border border-border bg-surface px-3 py-1.5 text-sm text-content placeholder:text-content-disabled focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddTag}
+                      disabled={discussionUpdating || !newTag.trim()}
+                      className="rounded-ado border border-border px-3 py-1.5 text-sm font-medium text-content-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Save/Cancel buttons */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={handleSubmitEdit}
+                    disabled={discussionUpdating}
+                    className="rounded-ado bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                  >
+                    {discussionUpdating ? 'Saving...' : 'Save changes'}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={discussionUpdating}
+                    className="rounded-ado border border-border px-4 py-2 text-sm font-medium text-content-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <span className="text-xs text-content-disabled">
+                    Press Esc to cancel, Ctrl+Enter to save
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <MarkdownRenderer content={discussion.body} />
+            )}
           </div>
 
-          {/* Labels - visible on mobile only */}
-          {discussion.labels.length > 0 && (
+          {/* Tags - visible on mobile only */}
+          {discussion.tags.length > 0 && (
             <div className="mb-8 flex flex-wrap gap-2 lg:hidden">
-              {discussion.labels.map((label) => (
+              {discussion.tags.map((tag) => (
                 <span
-                  key={label}
+                  key={tag}
                   className="rounded-full border border-border bg-surface-secondary px-2 py-0.5 text-xs text-content-secondary"
                 >
-                  {label}
+                  {tag}
                 </span>
               ))}
             </div>
@@ -355,19 +670,19 @@ export function DiscussionDetail({
             <CategoryBadge category={discussion.category} size="md" />
           </div>
 
-          {/* Labels Section */}
-          {discussion.labels.length > 0 && (
+          {/* Tags Section */}
+          {discussion.tags.length > 0 && (
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-secondary">
-                Labels
+                Tags
               </h3>
               <div className="flex flex-wrap gap-1.5">
-                {discussion.labels.map((label) => (
+                {discussion.tags.map((tag) => (
                   <span
-                    key={label}
+                    key={tag}
                     className="rounded-full border border-border bg-surface-secondary px-2 py-0.5 text-xs text-content-secondary"
                   >
-                    {label}
+                    {tag}
                   </span>
                 ))}
               </div>

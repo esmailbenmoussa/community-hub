@@ -26,12 +26,12 @@ const BASE_FIELDS = [
   '[System.State]',
   '[System.TeamProject]',
   '[System.CommentCount]',
+  '[System.Tags]',
   `[${DISCUSSION_FIELDS.Category}]`,
   `[${DISCUSSION_FIELDS.Visibility}]`,
   `[${DISCUSSION_FIELDS.TargetProjects}]`,
   `[${DISCUSSION_FIELDS.VoteCount}]`,
   `[${DISCUSSION_FIELDS.IsPinned}]`,
-  `[${DISCUSSION_FIELDS.Labels}]`,
 ];
 
 /**
@@ -111,13 +111,12 @@ export function buildWhereClause(
     );
   }
 
-  // Filter by labels (any label match)
-  if (filters?.labels && filters.labels.length > 0) {
-    const labelConditions = filters.labels.map(
-      (label) =>
-        `[${DISCUSSION_FIELDS.Labels}] CONTAINS '${escapeString(label)}'`
+  // Filter by tags (any tag match) - uses native ADO System.Tags
+  if (filters?.tags && filters.tags.length > 0) {
+    const tagConditions = filters.tags.map(
+      (tag) => `[System.Tags] CONTAINS '${escapeString(tag)}'`
     );
-    conditions.push(`(${labelConditions.join(' OR ')})`);
+    conditions.push(`(${tagConditions.join(' OR ')})`);
   }
 
   // Filter by title search
@@ -266,7 +265,7 @@ export function parseVisibility(value: string | undefined): VisibilityScope {
 }
 
 /**
- * Parse a JSON string array (for labels, target projects)
+ * Parse a JSON string array (for target projects)
  */
 export function parseJsonArray(value: string | undefined): string[] {
   if (!value) return [];
@@ -290,4 +289,15 @@ export function parseJsonArray(value: string | undefined): string[] {
     }
   }
   return [];
+}
+
+/**
+ * Parse ADO System.Tags field (semicolon-separated string) into array
+ */
+export function parseTagString(value: string | undefined | null): string[] {
+  if (!value || typeof value !== 'string') return [];
+  return value
+    .split(';')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }

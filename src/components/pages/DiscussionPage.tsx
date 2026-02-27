@@ -8,7 +8,7 @@ import { useDiscussion } from '@/hooks/useDiscussion';
 import { useComments } from '@/hooks/useComments';
 import { useAzureDevOps } from '@/hooks/useAzureDevOps';
 import { DiscussionDetail } from '@/components/organisms/DiscussionDetail';
-import { CommentReactionType } from '@/types';
+import { CommentReactionType, UpdateDiscussionInput } from '@/types';
 
 export function DiscussionPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,8 +21,10 @@ export function DiscussionPage() {
     discussion,
     hasVoted,
     isLoading: discussionLoading,
+    isUpdating: discussionUpdating,
     error: discussionError,
     toggleVote,
+    updateDiscussion,
   } = useDiscussion({
     discussionId,
     autoFetch: discussionId > 0,
@@ -56,6 +58,12 @@ export function DiscussionPage() {
 
   const handleDeleteComment = async (commentId: number) => {
     await deleteComment(commentId);
+  };
+
+  const handleEditDiscussion = async (
+    updates: UpdateDiscussionInput
+  ): Promise<boolean> => {
+    return await updateDiscussion(updates);
   };
 
   const handleToggleReaction = (
@@ -158,9 +166,11 @@ export function DiscussionPage() {
           onEditComment={handleEditComment}
           onDeleteComment={handleDeleteComment}
           onToggleReaction={handleToggleReaction}
+          onEditDiscussion={handleEditDiscussion}
           isLoading={discussionLoading}
           commentsLoading={commentsLoading}
           commentActionPending={commentSubmitting}
+          discussionUpdating={discussionUpdating}
         />
       )}
 
@@ -177,7 +187,7 @@ export function DiscussionPage() {
             voteCount: 0,
             commentCount: 0,
             isPinned: false,
-            labels: [],
+            tags: [],
             author: { id: '', displayName: '' },
             createdDate: new Date(),
             changedDate: new Date(),
