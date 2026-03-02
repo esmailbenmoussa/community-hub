@@ -86,42 +86,55 @@ export function useFieldMapping({
 
         const initMappings = initialMappingsRef.current;
 
-        // Try to auto-match if we have no initial mappings
-        if (Object.keys(initMappings).length === 0) {
-          const autoMatch = fieldMappingService.autoMatchFields(fields);
-          setCurrentMappings(autoMatch.matched);
+        // Helper function to validate mappings and set state
+        const validateAndSetMappings = (
+          mappings: Partial<Record<FieldPurpose, string>>
+        ) => {
+          setCurrentMappings(mappings);
+          const validations: Partial<
+            Record<FieldPurpose, FieldValidationResult>
+          > = {};
+          for (const [purpose, fieldRef] of Object.entries(mappings)) {
+            const field = fields.find((f) => f.referenceName === fieldRef);
+            if (field) {
+              validations[purpose as FieldPurpose] =
+                fieldMappingService.validateFieldSelection(
+                  field,
+                  purpose as FieldPurpose
+                );
+            }
+          }
+          setValidationResults(validations);
+        };
 
-          // Validate auto-matched fields
-          const validations: Partial<
-            Record<FieldPurpose, FieldValidationResult>
-          > = {};
-          for (const [purpose, fieldRef] of Object.entries(autoMatch.matched)) {
-            const field = fields.find((f) => f.referenceName === fieldRef);
-            if (field) {
-              validations[purpose as FieldPurpose] =
-                fieldMappingService.validateFieldSelection(
-                  field,
-                  purpose as FieldPurpose
-                );
-            }
-          }
-          setValidationResults(validations);
+        // First, try to load saved mapping from storage (takes precedence)
+        const savedMapping = await fieldMappingService.loadMapping();
+
+        if (
+          savedMapping?.config?.mappings &&
+          Object.keys(savedMapping.config.mappings).length > 0
+        ) {
+          // Use saved mapping
+          console.log(
+            '[useFieldMapping] Loaded saved mapping:',
+            savedMapping.config.mappings
+          );
+          validateAndSetMappings(savedMapping.config.mappings);
+        } else if (Object.keys(initMappings).length === 0) {
+          // No saved mapping and no initial mappings - run auto-match
+          const autoMatch = fieldMappingService.autoMatchFields(fields);
+          console.log(
+            '[useFieldMapping] Auto-matched fields:',
+            autoMatch.matched
+          );
+          validateAndSetMappings(autoMatch.matched);
         } else {
-          // Validate initial mappings
-          const validations: Partial<
-            Record<FieldPurpose, FieldValidationResult>
-          > = {};
-          for (const [purpose, fieldRef] of Object.entries(initMappings)) {
-            const field = fields.find((f) => f.referenceName === fieldRef);
-            if (field) {
-              validations[purpose as FieldPurpose] =
-                fieldMappingService.validateFieldSelection(
-                  field,
-                  purpose as FieldPurpose
-                );
-            }
-          }
-          setValidationResults(validations);
+          // Use provided initial mappings
+          console.log(
+            '[useFieldMapping] Using initial mappings:',
+            initMappings
+          );
+          validateAndSetMappings(initMappings);
         }
       } catch (err) {
         console.error('[useFieldMapping] Error loading fields:', err);
