@@ -33,6 +33,28 @@ import { RestClientBase } from 'azure-devops-extension-api/Common/RestClientBase
 import type { IVssRestClientOptions } from 'azure-devops-extension-api/Common/Context';
 
 /**
+ * Mapping from Azure DevOps API numeric reaction type values to our enum strings.
+ * The API returns reactions as numeric enum values (0=like, 1=dislike, 2=heart, etc.)
+ * but our CommentReactionType enum uses string values.
+ */
+const REACTION_TYPE_FROM_API: Record<
+  number | string,
+  CommentReactionType | undefined
+> = {
+  0: CommentReactionType.Like,
+  like: CommentReactionType.Like,
+  // 1 = dislike - not supported in our UI
+  2: CommentReactionType.Heart,
+  heart: CommentReactionType.Heart,
+  3: CommentReactionType.Hooray,
+  hooray: CommentReactionType.Hooray,
+  4: CommentReactionType.Smile,
+  smile: CommentReactionType.Smile,
+  5: CommentReactionType.Confused,
+  confused: CommentReactionType.Confused,
+};
+
+/**
  * ADO API response types for comments
  */
 interface CommentResponse {
@@ -2191,6 +2213,23 @@ export class CommentService {
       uniqueName: response.createdBy?.uniqueName,
     };
 
+    // Map reactions, converting API numeric/string types to our enum values
+    const mappedReactions = response.reactions
+      ?.map((r) => {
+        const reactionType = REACTION_TYPE_FROM_API[r.type];
+        if (!reactionType) {
+          // Skip unsupported reaction types (e.g., dislike)
+          return null;
+        }
+        return {
+          commentId: r.commentId,
+          type: reactionType,
+          count: r.count,
+          isCurrentUserEngaged: r.isCurrentUserEngaged,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
     return {
       id: response.id,
       text: response.text,
@@ -2203,12 +2242,7 @@ export class CommentService {
         : undefined,
       workItemId,
       version: response.version,
-      reactions: response.reactions?.map((r) => ({
-        commentId: r.commentId,
-        type: r.type as CommentReactionType,
-        count: r.count,
-        isCurrentUserEngaged: r.isCurrentUserEngaged,
-      })),
+      reactions: mappedReactions,
     };
   }
 }
