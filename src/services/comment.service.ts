@@ -47,6 +47,12 @@ interface CommentResponse {
   };
   createdDate?: string;
   modifiedDate?: string;
+  reactions?: Array<{
+    commentId: number;
+    type: string;
+    count: number;
+    isCurrentUserEngaged: boolean;
+  }>;
 }
 
 interface CommentsResponse {
@@ -2196,6 +2202,12 @@ export class CommentService {
         : undefined,
       workItemId,
       version: response.version,
+      reactions: response.reactions?.map((r) => ({
+        commentId: r.commentId,
+        type: r.type as CommentReactionType,
+        count: r.count,
+        isCurrentUserEngaged: r.isCurrentUserEngaged,
+      })),
     };
   }
 }
