@@ -2,6 +2,9 @@
  * Discussion Service
  * Handles CRUD operations for discussions using Azure DevOps Work Items API.
  * Discussions are stored as custom Work Items of type "Discussion".
+ *
+ * This service now uses dynamic field resolution to prevent TF51005 errors
+ * when custom fields don't exist in the user's process template.
  */
 
 import * as SDK from 'azure-devops-extension-sdk';
@@ -17,12 +20,18 @@ import {
 } from '@/types';
 import { isDevMode } from '@/utils/environment';
 import {
-  buildListDiscussionsQuery,
+  buildListDiscussionsQueryWithFields,
   parseCategory,
   parseVisibility,
   parseJsonArray,
   parseTagString,
 } from '@/utils/wiql';
+import {
+  resolveFields,
+  resolveFieldsSync,
+  ResolvedFields,
+  FieldCapabilities,
+} from '@/utils/fieldResolver';
 import {
   mockDiscussions,
   getMockDiscussionById,
@@ -81,6 +90,11 @@ export class DiscussionService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private workItemClient: any = null;
 
+  /** Cached resolved field names */
+  private resolvedFields: ResolvedFields | null = null;
+  /** Cached field capabilities */
+  private fieldCapabilities: FieldCapabilities | null = null;
+
   /**
    * Initialize the service with the current project context
    */
@@ -88,6 +102,19 @@ export class DiscussionService {
     if (isDevMode()) {
       this.projectId = 'mock-project-id';
       this.projectName = 'mock-project';
+      // In dev mode, use default fields
+      this.resolvedFields = {
+        Category: DISCUSSION_FIELDS.Category,
+        Visibility: DISCUSSION_FIELDS.Visibility,
+        TargetProjects: DISCUSSION_FIELDS.TargetProjects,
+        VoteCount: DISCUSSION_FIELDS.VoteCount,
+        IsPinned: DISCUSSION_FIELDS.IsPinned,
+      };
+      this.fieldCapabilities = {
+        crossProjectEnabled: true,
+        votingEnabled: true,
+        pinningEnabled: true,
+      };
       console.log('[DiscussionService] Running in dev mode - using mock data');
       return;
     }
@@ -97,6 +124,81 @@ export class DiscussionService {
     this.projectName = webContext.project?.name || null;
 
     this.workItemClient = await getWorkItemTrackingClient();
+
+    // Resolve field names from the field mapping
+    try {
+      const resolution = await resolveFields(true); // useDefaults=true for backward compatibility
+      this.resolvedFields = resolution.fields;
+      this.fieldCapabilities = resolution.capabilities;
+
+      console.log('[DiscussionService] Field resolution:', {
+        fields: this.resolvedFields,
+        capabilities: this.fieldCapabilities,
+        isValid: resolution.isValid,
+      });
+
+      if (!resolution.isValid) {
+        console.warn(
+          '[DiscussionService] Field resolution incomplete:',
+          resolution.error
+        );
+      }
+    } catch (error) {
+      console.error('[DiscussionService] Error resolving fields:', error);
+      // Fall back to default fields
+      this.resolvedFields = {
+        Category: DISCUSSION_FIELDS.Category,
+        Visibility: DISCUSSION_FIELDS.Visibility,
+        TargetProjects: DISCUSSION_FIELDS.TargetProjects,
+        VoteCount: DISCUSSION_FIELDS.VoteCount,
+        IsPinned: DISCUSSION_FIELDS.IsPinned,
+      };
+      this.fieldCapabilities = {
+        crossProjectEnabled: true,
+        votingEnabled: true,
+        pinningEnabled: true,
+      };
+    }
+  }
+
+  /**
+   * Get resolved fields (with fallback if not initialized)
+   */
+  private getFields(): ResolvedFields {
+    if (this.resolvedFields) {
+      return this.resolvedFields;
+    }
+
+    // Try sync resolution if not initialized
+    try {
+      const resolution = resolveFieldsSync(true);
+      return resolution.fields;
+    } catch {
+      // Ultimate fallback to hardcoded defaults
+      return {
+        Category: DISCUSSION_FIELDS.Category,
+        Visibility: DISCUSSION_FIELDS.Visibility,
+        TargetProjects: DISCUSSION_FIELDS.TargetProjects,
+        VoteCount: DISCUSSION_FIELDS.VoteCount,
+        IsPinned: DISCUSSION_FIELDS.IsPinned,
+      };
+    }
+  }
+
+  /**
+   * Get field capabilities
+   */
+  getCapabilities(): FieldCapabilities {
+    if (this.fieldCapabilities) {
+      return this.fieldCapabilities;
+    }
+
+    // Default to all enabled if not resolved
+    return {
+      crossProjectEnabled: true,
+      votingEnabled: true,
+      pinningEnabled: true,
+    };
   }
 
   /**
@@ -124,6 +226,8 @@ export class DiscussionService {
       throw new Error('Project context not available');
     }
 
+    const fields = this.getFields();
+
     // Build patch document for Work Item creation
     const patchDocument: JsonPatchOperation[] = [
       {
@@ -138,28 +242,13 @@ export class DiscussionService {
       },
       {
         op: 'add',
-        path: `/fields/${DISCUSSION_FIELDS.Category}`,
+        path: `/fields/${fields.Category}`,
         value: input.category,
       },
       {
         op: 'add',
-        path: `/fields/${DISCUSSION_FIELDS.Visibility}`,
+        path: `/fields/${fields.Visibility}`,
         value: input.visibility,
-      },
-      {
-        op: 'add',
-        path: `/fields/${DISCUSSION_FIELDS.TargetProjects}`,
-        value: JSON.stringify(input.targetProjects || []),
-      },
-      {
-        op: 'add',
-        path: `/fields/${DISCUSSION_FIELDS.VoteCount}`,
-        value: 0,
-      },
-      {
-        op: 'add',
-        path: `/fields/${DISCUSSION_FIELDS.IsPinned}`,
-        value: false,
       },
       {
         op: 'add',
@@ -167,6 +256,31 @@ export class DiscussionService {
         value: (input.tags || []).join('; '),
       },
     ];
+
+    // Add optional fields only if they are mapped
+    if (fields.TargetProjects) {
+      patchDocument.push({
+        op: 'add',
+        path: `/fields/${fields.TargetProjects}`,
+        value: JSON.stringify(input.targetProjects || []),
+      });
+    }
+
+    if (fields.VoteCount) {
+      patchDocument.push({
+        op: 'add',
+        path: `/fields/${fields.VoteCount}`,
+        value: 0,
+      });
+    }
+
+    if (fields.IsPinned) {
+      patchDocument.push({
+        op: 'add',
+        path: `/fields/${fields.IsPinned}`,
+        value: false,
+      });
+    }
 
     try {
       const workItem = await this.workItemClient.createWorkItem(
@@ -233,6 +347,8 @@ export class DiscussionService {
       return updated;
     }
 
+    const fields = this.getFields();
+
     // Build patch document for updates
     const patchDocument: JsonPatchOperation[] = [];
 
@@ -255,15 +371,16 @@ export class DiscussionService {
     if (updates.visibility !== undefined) {
       patchDocument.push({
         op: 'replace',
-        path: `/fields/${DISCUSSION_FIELDS.Visibility}`,
+        path: `/fields/${fields.Visibility}`,
         value: updates.visibility,
       });
     }
 
-    if (updates.targetProjects !== undefined) {
+    // Only update TargetProjects if the field is mapped
+    if (updates.targetProjects !== undefined && fields.TargetProjects) {
       patchDocument.push({
         op: 'replace',
-        path: `/fields/${DISCUSSION_FIELDS.TargetProjects}`,
+        path: `/fields/${fields.TargetProjects}`,
         value: JSON.stringify(updates.targetProjects),
       });
     }
@@ -276,10 +393,11 @@ export class DiscussionService {
       });
     }
 
-    if (updates.isPinned !== undefined) {
+    // Only update IsPinned if the field is mapped
+    if (updates.isPinned !== undefined && fields.IsPinned) {
       patchDocument.push({
         op: 'replace',
-        path: `/fields/${DISCUSSION_FIELDS.IsPinned}`,
+        path: `/fields/${fields.IsPinned}`,
         value: updates.isPinned,
       });
     }
@@ -353,17 +471,24 @@ export class DiscussionService {
       throw new Error('Project context not available');
     }
 
+    const fields = this.getFields();
+    const capabilities = this.getCapabilities();
+
     try {
-      // Build WIQL query
-      const wiql = buildListDiscussionsQuery(
+      // Build WIQL query with resolved fields
+      // Only enable cross-project if TargetProjects field is mapped
+      const wiql = buildListDiscussionsQueryWithFields(
         this.projectId,
         options.filters,
         options.sort,
         {
           includeOrgWide: true,
-          includeCrossProject: true,
+          includeCrossProject: capabilities.crossProjectEnabled,
+          fields,
         }
       );
+
+      console.log('[DiscussionService] Executing WIQL query:', wiql);
 
       // Execute WIQL query
       const queryResult: WorkItemQueryResult =
@@ -507,16 +632,25 @@ export class DiscussionService {
       return;
     }
 
+    const fields = this.getFields();
+
+    // Skip if VoteCount field is not mapped
+    if (!fields.VoteCount) {
+      console.warn(
+        '[DiscussionService] VoteCount field not mapped, skipping vote count update'
+      );
+      return;
+    }
+
     try {
       // First get current vote count
       const workItem = await this.workItemClient.getWorkItem(id);
-      const currentCount =
-        (workItem.fields?.[DISCUSSION_FIELDS.VoteCount] as number) || 0;
+      const currentCount = (workItem.fields?.[fields.VoteCount] as number) || 0;
 
       const patchDocument: JsonPatchOperation[] = [
         {
           op: 'replace',
-          path: `/fields/${DISCUSSION_FIELDS.VoteCount}`,
+          path: `/fields/${fields.VoteCount}`,
           value: Math.max(0, currentCount + delta),
         },
       ];
@@ -572,9 +706,10 @@ export class DiscussionService {
    * Map a Work Item to a Discussion object
    */
   private mapWorkItemToDiscussion(workItem: WorkItem): Discussion {
-    const fields = workItem.fields || {};
+    const wiFields = workItem.fields || {};
+    const resolvedFields = this.getFields();
 
-    const createdBy = fields['System.CreatedBy'] as
+    const createdBy = wiFields['System.CreatedBy'] as
       | {
           displayName?: string;
           id?: string;
@@ -590,27 +725,41 @@ export class DiscussionService {
       uniqueName: createdBy?.uniqueName,
     };
 
+    // Get field values using resolved field names
+    // Use defaults for optional fields that aren't mapped
+    const categoryValue = resolvedFields.Category
+      ? (wiFields[resolvedFields.Category] as string)
+      : undefined;
+    const visibilityValue = resolvedFields.Visibility
+      ? (wiFields[resolvedFields.Visibility] as string)
+      : undefined;
+    const targetProjectsValue = resolvedFields.TargetProjects
+      ? (wiFields[resolvedFields.TargetProjects] as string)
+      : undefined;
+    const voteCountValue = resolvedFields.VoteCount
+      ? (wiFields[resolvedFields.VoteCount] as number)
+      : undefined;
+    const isPinnedValue = resolvedFields.IsPinned
+      ? (wiFields[resolvedFields.IsPinned] as boolean)
+      : undefined;
+
     return {
       id: workItem.id,
-      title: (fields['System.Title'] as string) || '',
-      body: (fields['System.Description'] as string) || '',
-      category: parseCategory(fields[DISCUSSION_FIELDS.Category] as string),
-      visibility: parseVisibility(
-        fields[DISCUSSION_FIELDS.Visibility] as string
-      ),
-      targetProjects: parseJsonArray(
-        fields[DISCUSSION_FIELDS.TargetProjects] as string
-      ),
-      voteCount: (fields[DISCUSSION_FIELDS.VoteCount] as number) || 0,
-      commentCount: (fields['System.CommentCount'] as number) || 0,
-      isPinned: (fields[DISCUSSION_FIELDS.IsPinned] as boolean) || false,
-      tags: parseTagString(fields['System.Tags'] as string),
+      title: (wiFields['System.Title'] as string) || '',
+      body: (wiFields['System.Description'] as string) || '',
+      category: parseCategory(categoryValue),
+      visibility: parseVisibility(visibilityValue),
+      targetProjects: parseJsonArray(targetProjectsValue),
+      voteCount: voteCountValue || 0,
+      commentCount: (wiFields['System.CommentCount'] as number) || 0,
+      isPinned: isPinnedValue || false,
+      tags: parseTagString(wiFields['System.Tags'] as string),
       author,
-      createdDate: new Date(fields['System.CreatedDate'] as string),
-      changedDate: new Date(fields['System.ChangedDate'] as string),
+      createdDate: new Date(wiFields['System.CreatedDate'] as string),
+      changedDate: new Date(wiFields['System.ChangedDate'] as string),
       projectId: '', // Will be populated from context
-      projectName: (fields['System.TeamProject'] as string) || '',
-      state: (fields['System.State'] as string) || 'Active',
+      projectName: (wiFields['System.TeamProject'] as string) || '',
+      state: (wiFields['System.State'] as string) || 'Active',
     };
   }
 

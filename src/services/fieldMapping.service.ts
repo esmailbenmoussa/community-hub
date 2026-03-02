@@ -441,6 +441,35 @@ export class FieldMappingService {
   }
 
   /**
+   * Get the field mapping safely without throwing.
+   * Returns null if not configured, otherwise returns partial mapping.
+   * Use this for graceful degradation scenarios.
+   */
+  getFieldMapSafe(): Partial<Record<FieldPurpose, string>> | null {
+    if (!this.cachedMapping) {
+      return null;
+    }
+
+    const result: Partial<Record<FieldPurpose, string>> = {};
+    for (const purpose of ALL_FIELD_PURPOSES) {
+      const mapped = this.cachedMapping.mappings[purpose];
+      if (mapped) {
+        result[purpose] = mapped;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get a specific field reference name by purpose.
+   * Returns undefined if not mapped.
+   */
+  getFieldReference(purpose: FieldPurpose): string | undefined {
+    return this.cachedMapping?.mappings[purpose];
+  }
+
+  /**
    * Clear the cached mapping (useful for re-running setup).
    */
   clearCache(): void {

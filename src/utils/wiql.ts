@@ -2,6 +2,9 @@
  * WIQL Query Builder
  * Utility functions for building Work Item Query Language (WIQL) queries
  * for fetching discussions from Azure DevOps.
+ *
+ * This module now supports dynamic field resolution to prevent TF51005 errors
+ * when custom fields don't exist in the user's process template.
  */
 
 import {
@@ -12,11 +15,12 @@ import {
   Category,
   VisibilityScope,
 } from '@/types';
+import { ResolvedFields } from './fieldResolver';
 
 /**
- * Base fields to select for discussion queries
+ * System fields that are always available in ADO
  */
-const BASE_FIELDS = [
+const SYSTEM_FIELDS = [
   '[System.Id]',
   '[System.Title]',
   '[System.Description]',
@@ -27,6 +31,14 @@ const BASE_FIELDS = [
   '[System.TeamProject]',
   '[System.CommentCount]',
   '[System.Tags]',
+];
+
+/**
+ * Legacy base fields - used when no resolved fields are provided.
+ * @deprecated Use buildSelectClauseWithFields instead
+ */
+const BASE_FIELDS = [
+  ...SYSTEM_FIELDS,
   `[${DISCUSSION_FIELDS.Category}]`,
   `[${DISCUSSION_FIELDS.Visibility}]`,
   `[${DISCUSSION_FIELDS.TargetProjects}]`,
@@ -35,7 +47,49 @@ const BASE_FIELDS = [
 ];
 
 /**
- * Build the SELECT clause for discussion queries
+ * Build custom fields array based on resolved field mapping.
+ * Only includes fields that are actually mapped.
+ */
+function buildCustomFields(fields: ResolvedFields): string[] {
+  const customFields: string[] = [];
+
+  // Required fields (always present after setup)
+  if (fields.Category) {
+    customFields.push(`[${fields.Category}]`);
+  }
+  if (fields.Visibility) {
+    customFields.push(`[${fields.Visibility}]`);
+  }
+
+  // Optional fields (only if mapped)
+  if (fields.TargetProjects) {
+    customFields.push(`[${fields.TargetProjects}]`);
+  }
+  if (fields.VoteCount) {
+    customFields.push(`[${fields.VoteCount}]`);
+  }
+  if (fields.IsPinned) {
+    customFields.push(`[${fields.IsPinned}]`);
+  }
+
+  return customFields;
+}
+
+/**
+ * Build the SELECT clause for discussion queries using resolved fields.
+ * Only includes fields that are mapped in the field configuration.
+ *
+ * @param fields - Resolved field reference names
+ * @returns SELECT clause string
+ */
+export function buildSelectClauseWithFields(fields: ResolvedFields): string {
+  const allFields = [...SYSTEM_FIELDS, ...buildCustomFields(fields)];
+  return `SELECT ${allFields.join(', ')}`;
+}
+
+/**
+ * Build the SELECT clause for discussion queries.
+ * @deprecated Use buildSelectClauseWithFields with resolved fields instead
  */
 export function buildSelectClause(): string {
   return `SELECT ${BASE_FIELDS.join(', ')}`;
@@ -49,15 +103,43 @@ export function buildFromClause(): string {
 }
 
 /**
- * Build a WHERE clause for discussion queries
+ * Options for building WHERE clauses with resolved fields
  */
-export function buildWhereClause(
+export interface WhereClauseOptions {
+  /** Include org-wide discussions */
+  includeOrgWide?: boolean;
+  /** Include cross-project discussions (requires TargetProjects field) */
+  includeCrossProject?: boolean;
+  /** Resolved field reference names */
+  fields?: ResolvedFields;
+}
+
+/**
+ * Build a WHERE clause for discussion queries using resolved fields.
+ *
+ * @param projectId - Current project ID
+ * @param filters - Optional filters to apply
+ * @param options - Options including resolved fields
+ * @returns WHERE clause string
+ */
+export function buildWhereClauseWithFields(
   projectId: string,
   filters?: DiscussionFilters,
-  includeOrgWide: boolean = false,
-  includeCrossProject: boolean = false
+  options?: WhereClauseOptions
 ): string {
   const conditions: string[] = [];
+  const fields = options?.fields;
+  const includeOrgWide = options?.includeOrgWide ?? false;
+
+  // Cross-project requires the TargetProjects field to be mapped
+  const includeCrossProject =
+    options?.includeCrossProject && fields?.TargetProjects;
+
+  // Get field references (with fallback to defaults for backward compatibility)
+  const visibilityField = fields?.Visibility || DISCUSSION_FIELDS.Visibility;
+  const categoryField = fields?.Category || DISCUSSION_FIELDS.Category;
+  const isPinnedField = fields?.IsPinned;
+  const targetProjectsField = fields?.TargetProjects;
 
   // Always filter by Discussion Work Item Type
   conditions.push(`[System.WorkItemType] = '${DISCUSSION_WORK_ITEM_TYPE}'`);
@@ -69,20 +151,21 @@ export function buildWhereClause(
 
     // Include project-specific discussions
     visibilityConditions.push(
-      `([System.TeamProject] = @project AND [${DISCUSSION_FIELDS.Visibility}] = '${VisibilityScope.Project}')`
+      `([System.TeamProject] = @project AND [${visibilityField}] = '${VisibilityScope.Project}')`
     );
 
     // Include org-wide discussions from any project
     if (includeOrgWide) {
       visibilityConditions.push(
-        `[${DISCUSSION_FIELDS.Visibility}] = '${VisibilityScope.Organization}'`
+        `[${visibilityField}] = '${VisibilityScope.Organization}'`
       );
     }
 
     // Include cross-project discussions that target this project
-    if (includeCrossProject) {
+    // Only if TargetProjects field is mapped
+    if (includeCrossProject && targetProjectsField) {
       visibilityConditions.push(
-        `([${DISCUSSION_FIELDS.Visibility}] = '${VisibilityScope.CrossProject}' AND [${DISCUSSION_FIELDS.TargetProjects}] CONTAINS '${projectId}')`
+        `([${visibilityField}] = '${VisibilityScope.CrossProject}' AND [${targetProjectsField}] CONTAINS '${projectId}')`
       );
     }
 
@@ -94,20 +177,18 @@ export function buildWhereClause(
 
   // Filter by category
   if (filters?.category) {
-    conditions.push(`[${DISCUSSION_FIELDS.Category}] = '${filters.category}'`);
+    conditions.push(`[${categoryField}] = '${filters.category}'`);
   }
 
   // Filter by visibility
   if (filters?.visibility) {
-    conditions.push(
-      `[${DISCUSSION_FIELDS.Visibility}] = '${filters.visibility}'`
-    );
+    conditions.push(`[${visibilityField}] = '${filters.visibility}'`);
   }
 
-  // Filter by pinned status
-  if (filters?.isPinned !== undefined) {
+  // Filter by pinned status - only if IsPinned field is mapped
+  if (filters?.isPinned !== undefined && isPinnedField) {
     conditions.push(
-      `[${DISCUSSION_FIELDS.IsPinned}] = ${filters.isPinned ? 'true' : 'false'}`
+      `[${isPinnedField}] = ${filters.isPinned ? 'true' : 'false'}`
     );
   }
 
@@ -133,7 +214,63 @@ export function buildWhereClause(
 }
 
 /**
- * Build an ORDER BY clause for discussion queries
+ * Build a WHERE clause for discussion queries.
+ * @deprecated Use buildWhereClauseWithFields with resolved fields instead
+ */
+export function buildWhereClause(
+  projectId: string,
+  filters?: DiscussionFilters,
+  includeOrgWide: boolean = false,
+  includeCrossProject: boolean = false
+): string {
+  return buildWhereClauseWithFields(projectId, filters, {
+    includeOrgWide,
+    includeCrossProject,
+    // No resolved fields - uses hardcoded defaults
+  });
+}
+
+/**
+ * Build an ORDER BY clause for discussion queries using resolved fields.
+ *
+ * @param sort - Sort option
+ * @param fields - Resolved field reference names
+ * @returns ORDER BY clause string
+ */
+export function buildOrderByClauseWithFields(
+  sort?: SortOption,
+  fields?: ResolvedFields
+): string {
+  const voteCountField = fields?.VoteCount;
+  const isPinnedField = fields?.IsPinned;
+
+  switch (sort) {
+    case SortOption.TopVoted:
+      // Fall back to date sort if VoteCount field is not mapped
+      if (voteCountField) {
+        return `ORDER BY [${voteCountField}] DESC, [System.CreatedDate] DESC`;
+      }
+      console.warn(
+        '[WIQL] VoteCount field not mapped, falling back to date sort'
+      );
+      return `ORDER BY [System.CreatedDate] DESC`;
+
+    case SortOption.MostActive:
+      return `ORDER BY [System.ChangedDate] DESC`;
+
+    case SortOption.Newest:
+    default:
+      // Pinned items first (if field is mapped), then by creation date
+      if (isPinnedField) {
+        return `ORDER BY [${isPinnedField}] DESC, [System.CreatedDate] DESC`;
+      }
+      return `ORDER BY [System.CreatedDate] DESC`;
+  }
+}
+
+/**
+ * Build an ORDER BY clause for discussion queries.
+ * @deprecated Use buildOrderByClauseWithFields with resolved fields instead
  */
 export function buildOrderByClause(sort?: SortOption): string {
   switch (sort) {
@@ -149,7 +286,59 @@ export function buildOrderByClause(sort?: SortOption): string {
 }
 
 /**
- * Build a complete WIQL query for listing discussions
+ * Options for building discussion list queries
+ */
+export interface ListQueryOptions {
+  /** Include org-wide discussions */
+  includeOrgWide?: boolean;
+  /** Include cross-project discussions */
+  includeCrossProject?: boolean;
+  /** Resolved field reference names */
+  fields?: ResolvedFields;
+}
+
+/**
+ * Build a complete WIQL query for listing discussions with resolved fields.
+ *
+ * @param projectId - Current project ID
+ * @param filters - Optional filters
+ * @param sort - Sort option
+ * @param options - Query options including resolved fields
+ * @returns Complete WIQL query string
+ */
+export function buildListDiscussionsQueryWithFields(
+  projectId: string,
+  filters?: DiscussionFilters,
+  sort?: SortOption,
+  options?: ListQueryOptions
+): string {
+  const fields = options?.fields;
+
+  // If no fields provided, fall back to legacy behavior
+  if (!fields) {
+    return buildListDiscussionsQuery(projectId, filters, sort, {
+      includeOrgWide: options?.includeOrgWide,
+      includeCrossProject: options?.includeCrossProject,
+    });
+  }
+
+  const select = buildSelectClauseWithFields(fields);
+  const from = buildFromClause();
+  const where = buildWhereClauseWithFields(projectId, filters, {
+    includeOrgWide: options?.includeOrgWide,
+    // Cross-project is only enabled if TargetProjects field exists
+    includeCrossProject:
+      options?.includeCrossProject && !!fields.TargetProjects,
+    fields,
+  });
+  const orderBy = buildOrderByClauseWithFields(sort, fields);
+
+  return `${select} ${from} ${where} ${orderBy}`;
+}
+
+/**
+ * Build a complete WIQL query for listing discussions.
+ * @deprecated Use buildListDiscussionsQueryWithFields with resolved fields instead
  */
 export function buildListDiscussionsQuery(
   projectId: string,
@@ -174,7 +363,27 @@ export function buildListDiscussionsQuery(
 }
 
 /**
- * Build a WIQL query to get a single discussion by ID
+ * Build a WIQL query to get a single discussion by ID with resolved fields.
+ *
+ * @param discussionId - Discussion work item ID
+ * @param fields - Resolved field reference names
+ * @returns WIQL query string
+ */
+export function buildGetDiscussionQueryWithFields(
+  discussionId: number,
+  fields?: ResolvedFields
+): string {
+  const select = fields
+    ? buildSelectClauseWithFields(fields)
+    : buildSelectClause();
+  const from = buildFromClause();
+
+  return `${select} ${from} WHERE [System.Id] = ${discussionId}`;
+}
+
+/**
+ * Build a WIQL query to get a single discussion by ID.
+ * @deprecated Use buildGetDiscussionQueryWithFields with resolved fields instead
  */
 export function buildGetDiscussionQuery(discussionId: number): string {
   const select = buildSelectClause();
@@ -184,8 +393,67 @@ export function buildGetDiscussionQuery(discussionId: number): string {
 }
 
 /**
- * Build a WIQL query for org-level aggregated view
- * Gets discussions from all projects with org-wide or cross-project visibility
+ * Build a WIQL query for org-level aggregated view with resolved fields.
+ * Gets discussions from all projects with org-wide or cross-project visibility.
+ *
+ * @param filters - Optional filters
+ * @param sort - Sort option
+ * @param fields - Resolved field reference names
+ * @returns WIQL query string
+ */
+export function buildOrgLevelQueryWithFields(
+  filters?: DiscussionFilters,
+  sort?: SortOption,
+  fields?: ResolvedFields
+): string {
+  const select = fields
+    ? buildSelectClauseWithFields(fields)
+    : buildSelectClause();
+  const from = buildFromClause();
+
+  const visibilityField = fields?.Visibility || DISCUSSION_FIELDS.Visibility;
+  const categoryField = fields?.Category || DISCUSSION_FIELDS.Category;
+
+  const conditions: string[] = [];
+
+  // Always filter by Discussion Work Item Type
+  conditions.push(`[System.WorkItemType] = '${DISCUSSION_WORK_ITEM_TYPE}'`);
+
+  // Only show org-wide and cross-project discussions
+  conditions.push(
+    `([${visibilityField}] = '${VisibilityScope.Organization}' OR [${visibilityField}] = '${VisibilityScope.CrossProject}')`
+  );
+
+  // Apply additional filters
+  if (filters?.category) {
+    conditions.push(`[${categoryField}] = '${filters.category}'`);
+  }
+
+  if (filters?.projectId) {
+    conditions.push(
+      `[System.TeamProject] = '${escapeString(filters.projectId)}'`
+    );
+  }
+
+  if (filters?.searchTitle) {
+    conditions.push(
+      `[System.Title] CONTAINS '${escapeString(filters.searchTitle)}'`
+    );
+  }
+
+  // Only show active discussions
+  conditions.push(`[System.State] <> 'Removed'`);
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const orderBy = buildOrderByClauseWithFields(sort, fields);
+
+  return `${select} ${from} ${where} ${orderBy}`;
+}
+
+/**
+ * Build a WIQL query for org-level aggregated view.
+ * Gets discussions from all projects with org-wide or cross-project visibility.
+ * @deprecated Use buildOrgLevelQueryWithFields with resolved fields instead
  */
 export function buildOrgLevelQuery(
   filters?: DiscussionFilters,
