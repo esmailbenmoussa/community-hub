@@ -40,8 +40,12 @@
       "targets": ["ms.vss-web.project-hub-groups-collection"],
       "properties": {
         "name": "Community",
-        "icon": "asset://public/icons/community-icon.png",
-        "order": 50
+        "order": 50,
+        "uri": "dist/index.html",
+        "icon": {
+          "light": "public/icons/light-icon.png",
+          "dark": "public/icons/dark-icon.png"
+        }
       }
     },
     {
