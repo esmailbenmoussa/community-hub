@@ -1,30 +1,32 @@
 /**
  * NavigationPanel
- * Displays category navigation links in a card panel
+ * Displays category navigation links in a card panel.
+ * Uses dynamic categories from ADO picklist.
  */
 
-import { useAtomValue } from 'jotai';
-import { Category } from '@/types';
-import { categorySettingsAtom } from '@/store/categorySettingsAtom';
+import { CategoryValue } from '@/types';
+import { getCategorySetting } from '@/types/categorySettings';
 import { ICON_PRESETS, COLOR_PRESETS } from '@/config/categoryPresets';
+import { useCategories } from '@/hooks/useCategories';
 
 interface NavigationPanelProps {
   /** Currently selected category (undefined = all) */
-  selectedCategory?: Category;
+  selectedCategory?: CategoryValue;
   /** Callback when category is clicked */
-  onCategoryClick: (category?: Category) => void;
+  onCategoryClick: (category?: CategoryValue) => void;
 }
 
 /**
- * NavigationPanel component - displays category navigation in a card panel
- * Uses configurable icons and colors from the settings atom
+ * NavigationPanel component - displays category navigation in a card panel.
+ * Uses configurable icons and colors from the settings atom.
+ * Categories are dynamically loaded from ADO picklist.
  */
 export function NavigationPanel({
   selectedCategory,
   onCategoryClick,
 }: NavigationPanelProps) {
-  // Get category settings from atom
-  const categorySettings = useAtomValue(categorySettingsAtom);
+  // Get dynamic categories and settings from hook
+  const { categories, categorySettings, isLoading } = useCategories();
 
   return (
     <div className="p-4">
@@ -60,27 +62,34 @@ export function NavigationPanel({
           </h4>
         </div>
 
-        {Object.values(Category).map((category) => {
-          const setting = categorySettings[category];
-          const colorStyles = COLOR_PRESETS[setting.color];
+        {isLoading ? (
+          <div className="flex items-center gap-2 px-3 py-2 text-content-secondary">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        ) : (
+          categories.map((category) => {
+            const setting = getCategorySetting(category, categorySettings);
+            const colorStyles = COLOR_PRESETS[setting.color];
 
-          return (
-            <button
-              key={category}
-              onClick={() => onCategoryClick(category)}
-              className={`flex w-full items-center gap-2 rounded-ado px-3 py-2 text-left text-sm ${
-                selectedCategory === category
-                  ? 'bg-accent-light text-accent'
-                  : 'text-content-secondary hover:bg-surface-hover'
-              }`}
-            >
-              <span className={colorStyles.text}>
-                {ICON_PRESETS[setting.icon]('h-4 w-4')}
-              </span>
-              {category}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={category}
+                onClick={() => onCategoryClick(category)}
+                className={`flex w-full items-center gap-2 rounded-ado px-3 py-2 text-left text-sm ${
+                  selectedCategory === category
+                    ? 'bg-accent-light text-accent'
+                    : 'text-content-secondary hover:bg-surface-hover'
+                }`}
+              >
+                <span className={colorStyles.text}>
+                  {ICON_PRESETS[setting.icon]('h-4 w-4')}
+                </span>
+                {category}
+              </button>
+            );
+          })
+        )}
       </nav>
     </div>
   );

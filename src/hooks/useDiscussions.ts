@@ -8,7 +8,7 @@ import {
   Discussion,
   ListDiscussionsOptions,
   SortOption,
-  Category,
+  CategoryValue,
 } from '@/types';
 import { discussionService } from '@/services/discussion.service';
 import { voteService } from '@/services/vote.service';
@@ -33,7 +33,7 @@ function getSavedSortPreference(): SortOption {
 
 interface UseDiscussionsOptions {
   /** Initial category filter */
-  category?: Category;
+  category?: CategoryValue;
   /** Initial sort option */
   sort?: SortOption;
   /** Page size (default: 25) */
@@ -61,7 +61,7 @@ interface UseDiscussionsReturn {
   totalCount: number;
   /** Current filters */
   filters: {
-    category?: Category;
+    category?: CategoryValue;
     sort: SortOption;
   };
   /** Fetch/refresh discussions */
@@ -71,7 +71,7 @@ interface UseDiscussionsReturn {
   /** Go to a specific page */
   goToPage: (pageNum: number) => Promise<void>;
   /** Set category filter */
-  setCategory: (category?: Category) => void;
+  setCategory: (category?: CategoryValue) => void;
   /** Set sort option */
   setSort: (sort: SortOption) => void;
   /** Toggle vote on a discussion */
@@ -94,7 +94,7 @@ export function useDiscussions({
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [category, setCategory] = useState<Category | undefined>(
+  const [category, setCategory] = useState<CategoryValue | undefined>(
     initialCategory
   );
   const [sort, setSort] = useState<SortOption>(
@@ -206,7 +206,7 @@ export function useDiscussions({
   const totalPages = Math.ceil(totalCount / pageSize);
 
   // Update category filter
-  const handleSetCategory = useCallback((newCategory?: Category) => {
+  const handleSetCategory = useCallback((newCategory?: CategoryValue) => {
     setCategory(newCategory);
     setPage(1);
   }, []);

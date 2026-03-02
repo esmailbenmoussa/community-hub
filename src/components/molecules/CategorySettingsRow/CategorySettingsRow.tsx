@@ -3,15 +3,15 @@
  * A row for configuring a single category's icon and color
  */
 
-import { Category } from '@/types';
+import { CategoryValue } from '@/types';
 import { CategorySetting } from '@/types/categorySettings';
 import { IconPicker } from '@/components/molecules/IconPicker';
 import { ColorPicker } from '@/components/molecules/ColorPicker';
 import { ICON_PRESETS, COLOR_PRESETS } from '@/config/categoryPresets';
 
 interface CategorySettingsRowProps {
-  /** The category being configured */
-  category: Category;
+  /** The category being configured (can be any string from ADO picklist) */
+  category: CategoryValue;
   /** Current settings for this category */
   setting: CategorySetting;
   /** Callback when settings change */

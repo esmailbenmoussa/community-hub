@@ -8,7 +8,9 @@
 // ============================================
 
 /**
- * Discussion categories
+ * Default discussion categories.
+ * These are the built-in categories that come pre-configured.
+ * Additional categories can be defined in the ADO picklist field.
  */
 export enum Category {
   Announcements = 'Announcements',
@@ -16,6 +18,19 @@ export enum Category {
   Ideas = 'Ideas',
   Help = 'Help',
 }
+
+/**
+ * Type alias for category values.
+ * This allows for both the default enum values and custom categories from ADO picklists.
+ * Use this type when accepting category values that may come from dynamic sources.
+ */
+export type CategoryValue = string;
+
+/**
+ * Default category values as an array for iteration.
+ * Use this when you need to iterate over the built-in categories.
+ */
+export const DEFAULT_CATEGORIES: CategoryValue[] = Object.values(Category);
 
 /**
  * Visibility scope for discussions
@@ -75,8 +90,8 @@ export interface Discussion {
   title: string;
   /** Discussion body content (markdown) */
   body: string;
-  /** Category */
-  category: Category;
+  /** Category (can be a default enum value or custom from ADO picklist) */
+  category: CategoryValue;
   /** Visibility scope */
   visibility: VisibilityScope;
   /** Target project IDs for cross-project visibility */
@@ -182,7 +197,7 @@ export interface LeaderboardEntry {
 export interface CreateDiscussionInput {
   title: string;
   body: string;
-  category: Category;
+  category: CategoryValue;
   visibility: VisibilityScope;
   targetProjects?: string[];
   tags?: string[];
@@ -222,7 +237,7 @@ export interface UpdateCommentInput {
  * Filter options for discussion list
  */
 export interface DiscussionFilters {
-  category?: Category;
+  category?: CategoryValue;
   tags?: string[];
   visibility?: VisibilityScope;
   projectId?: string;

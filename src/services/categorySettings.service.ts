@@ -1,6 +1,7 @@
 /**
  * Category Settings Service
- * Manages loading and saving of project-wide category icon and color settings
+ * Manages loading and saving of project-wide category icon and color settings.
+ * Supports dynamic categories from ADO picklists.
  */
 
 import * as SDK from 'azure-devops-extension-sdk';
@@ -8,6 +9,10 @@ import {
   CategorySettings,
   DEFAULT_CATEGORY_SETTINGS,
   EDS_COLLECTIONS,
+  CategoryValue,
+  CategorySetting,
+  buildCategorySettings,
+  FALLBACK_CATEGORY_SETTING,
 } from '@/types';
 import { isDevMode } from '@/utils/environment';
 
@@ -135,6 +140,44 @@ class CategorySettingsService {
       console.error('[CategorySettingsService] Error saving settings:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get settings for a list of categories, ensuring all have settings.
+   * Creates settings with fallbacks for categories that don't have stored settings.
+   * @param categories List of category names from ADO picklist
+   */
+  async getSettingsForCategories(
+    categories: CategoryValue[]
+  ): Promise<CategorySettings> {
+    const existingSettings = await this.loadSettings();
+    return buildCategorySettings(categories, existingSettings);
+  }
+
+  /**
+   * Update setting for a single category.
+   * @param category The category name
+   * @param setting The new setting
+   */
+  async updateCategorySetting(
+    category: CategoryValue,
+    setting: CategorySetting
+  ): Promise<void> {
+    const currentSettings = await this.loadSettings();
+    const updatedSettings = {
+      ...currentSettings,
+      [category]: setting,
+    };
+    await this.saveSettings(updatedSettings);
+  }
+
+  /**
+   * Get setting for a single category with fallback.
+   * @param category The category name
+   */
+  async getCategorySetting(category: CategoryValue): Promise<CategorySetting> {
+    const settings = await this.loadSettings();
+    return settings[category] ?? FALLBACK_CATEGORY_SETTING;
   }
 
   /**

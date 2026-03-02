@@ -1,5 +1,1 @@
-export {
-  CategoryBadge,
-  CATEGORY_ICONS,
-  CATEGORY_STYLES,
-} from './CategoryBadge';
+export { CategoryBadge } from './CategoryBadge';

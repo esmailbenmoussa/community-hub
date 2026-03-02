@@ -10,7 +10,7 @@ import { useSetAtom } from 'jotai';
 import {
   SetupStatus,
   SortOption,
-  Category,
+  CategoryValue,
   DEFAULT_USER_PREFERENCES,
 } from '@/types';
 import { validationService } from '@/services/validation.service';
@@ -182,7 +182,7 @@ export function HubPage() {
 
   // Sidebar category click handler
   const handleSidebarCategoryClick = useCallback(
-    (category?: Category) => {
+    (category?: CategoryValue) => {
       setCategory(category);
     },
     [setCategory]

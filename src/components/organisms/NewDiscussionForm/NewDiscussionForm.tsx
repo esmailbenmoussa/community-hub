@@ -1,16 +1,17 @@
 /**
  * NewDiscussionForm
- * Form for creating new discussions
+ * Form for creating new discussions with dynamic category selection
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Category, VisibilityScope, CreateDiscussionInput } from '@/types';
+import { CategoryValue, VisibilityScope, CreateDiscussionInput } from '@/types';
 import { Select, SelectOption } from '@/components/atoms/Select';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
 import { MarkdownEditor } from '@/components/molecules/MarkdownEditor';
 import { TagInput } from '@/components/molecules/TagInput';
 import { useTags } from '@/hooks/useTags';
+import { useCategories } from '@/hooks/useCategories';
 
 interface NewDiscussionFormProps {
   /** Callback when form is submitted */
@@ -19,35 +20,50 @@ interface NewDiscussionFormProps {
   onCancel: () => void;
   /** Whether the form is submitting */
   isSubmitting?: boolean;
-  /** Default category */
-  defaultCategory?: Category;
+  /** Default category (overrides the first category from picklist) */
+  defaultCategory?: CategoryValue;
 }
 
 /**
- * NewDiscussionForm component - form for creating new discussions
+ * NewDiscussionForm component - form for creating new discussions.
+ * Categories are dynamically loaded from ADO picklist configuration.
  */
 export function NewDiscussionForm({
   onSubmit,
   onCancel,
   isSubmitting = false,
-  defaultCategory = Category.Announcements,
+  defaultCategory,
 }: NewDiscussionFormProps) {
+  // Get dynamic categories from hook
+  const {
+    categories,
+    defaultCategory: hookDefaultCategory,
+    isLoading: categoriesLoading,
+  } = useCategories();
+
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [category, setCategory] = useState<Category>(defaultCategory);
+  const [category, setCategory] = useState<CategoryValue>(
+    defaultCategory ?? hookDefaultCategory
+  );
   const [visibility, setVisibility] = useState<VisibilityScope>(
     VisibilityScope.Project
   );
   const [tags, setTags] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Update category when categories load (if not already set to a valid value)
+  useEffect(() => {
+    if (!categoriesLoading && categories.length > 0) {
+      // If current category is not in the list, reset to default
+      if (!categories.includes(category)) {
+        setCategory(defaultCategory ?? categories[0]);
+      }
+    }
+  }, [categories, categoriesLoading, category, defaultCategory]);
+
   // Fetch available tags for autocomplete
   const { availableTags, isLoading: tagsLoading } = useTags();
-
-  // Category options (MVP: only Announcements)
-  const categoryOptions: SelectOption[] = [
-    { value: Category.Announcements, label: 'Announcements' },
-  ];
 
   // Visibility options
   const visibilityOptions: SelectOption[] = [
@@ -114,22 +130,29 @@ export function NewDiscussionForm({
         <label className="mb-2 block text-sm font-medium text-content">
           Category
         </label>
-        <div className="flex flex-wrap gap-2">
-          {categoryOptions.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setCategory(opt.value as Category)}
-              className={`transition-opacity ${
-                category === opt.value
-                  ? 'opacity-100'
-                  : 'opacity-50 hover:opacity-75'
-              }`}
-            >
-              <CategoryBadge category={opt.value as Category} />
-            </button>
-          ))}
-        </div>
+        {categoriesLoading ? (
+          <div className="flex items-center gap-2 text-content-secondary">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            <span className="text-sm">Loading categories...</span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategory(cat)}
+                className={`transition-opacity ${
+                  category === cat
+                    ? 'opacity-100'
+                    : 'opacity-50 hover:opacity-75'
+                }`}
+              >
+                <CategoryBadge category={cat} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Title */}
@@ -234,7 +257,7 @@ export function NewDiscussionForm({
         </button>
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || categoriesLoading}
           className="rounded-ado bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
           {isSubmitting ? 'Creating...' : 'Create discussion'}

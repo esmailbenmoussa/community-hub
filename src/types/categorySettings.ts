@@ -1,9 +1,10 @@
 /**
  * Category Settings Types
- * Type definitions for user-configurable category icons and colors
+ * Type definitions for user-configurable category icons and colors.
+ * Supports both default categories and custom categories from ADO picklists.
  */
 
-import { Category } from './discussion';
+import { Category, CategoryValue } from './discussion';
 
 /**
  * Available icon names for categories
@@ -49,16 +50,79 @@ export interface CategorySetting {
 }
 
 /**
- * Settings for all categories
+ * Settings for all categories (dynamic - supports any category string).
+ * Uses CategoryValue (string) as key to support custom categories from ADO picklists.
  */
-export type CategorySettings = Record<Category, CategorySetting>;
+export type CategorySettings = Record<CategoryValue, CategorySetting>;
 
 /**
- * Default category settings
+ * Default fallback setting for categories without explicit configuration.
+ * Used when a category is encountered that doesn't have stored settings.
  */
-export const DEFAULT_CATEGORY_SETTINGS: CategorySettings = {
+export const FALLBACK_CATEGORY_SETTING: CategorySetting = {
+  icon: 'tag',
+  color: 'gray',
+};
+
+/**
+ * Default settings for the built-in categories.
+ * These provide sensible defaults for the standard categories.
+ */
+export const BUILTIN_CATEGORY_SETTINGS: Record<Category, CategorySetting> = {
   [Category.Announcements]: { icon: 'megaphone', color: 'purple' },
   [Category.General]: { icon: 'chat', color: 'gray' },
   [Category.Ideas]: { icon: 'lightbulb', color: 'blue' },
   [Category.Help]: { icon: 'question', color: 'green' },
 };
+
+/**
+ * Default category settings - includes built-in categories.
+ * Additional categories will use FALLBACK_CATEGORY_SETTING.
+ */
+export const DEFAULT_CATEGORY_SETTINGS: CategorySettings = {
+  ...BUILTIN_CATEGORY_SETTINGS,
+};
+
+/**
+ * Get the setting for a category, with fallback for unknown categories.
+ * @param category The category to get settings for
+ * @param settings The current category settings
+ * @returns The category setting (from settings, built-in defaults, or fallback)
+ */
+export function getCategorySetting(
+  category: CategoryValue,
+  settings: CategorySettings
+): CategorySetting {
+  // First check if there's an explicit setting
+  if (settings[category]) {
+    return settings[category];
+  }
+  // Fall back to built-in defaults
+  if (BUILTIN_CATEGORY_SETTINGS[category as Category]) {
+    return BUILTIN_CATEGORY_SETTINGS[category as Category];
+  }
+  // Use generic fallback
+  return FALLBACK_CATEGORY_SETTING;
+}
+
+/**
+ * Merge category settings with defaults, ensuring all categories have settings.
+ * @param categories List of all categories (from ADO picklist)
+ * @param existingSettings Existing saved settings
+ * @returns Complete settings for all categories
+ */
+export function buildCategorySettings(
+  categories: CategoryValue[],
+  existingSettings?: Partial<CategorySettings>
+): CategorySettings {
+  const result: CategorySettings = {};
+
+  for (const category of categories) {
+    result[category] =
+      existingSettings?.[category] ??
+      BUILTIN_CATEGORY_SETTINGS[category as Category] ??
+      FALLBACK_CATEGORY_SETTING;
+  }
+
+  return result;
+}

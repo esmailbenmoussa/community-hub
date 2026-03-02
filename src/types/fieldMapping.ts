@@ -190,6 +190,17 @@ export interface FieldMappingConfig {
 }
 
 /**
+ * Metadata for a mapped field, including picklist values.
+ * This allows the extension to dynamically use values from ADO picklists.
+ */
+export interface FieldMetadata {
+  /** Allowed values for picklist fields */
+  allowedValues?: string[];
+  /** Display name of the field */
+  displayName?: string;
+}
+
+/**
  * Stored field mapping with metadata.
  * This is what gets persisted to the Extension Data Service.
  */
@@ -204,6 +215,8 @@ export interface StoredFieldMapping {
   savedAt: string;
   /** Schema version for future migrations */
   version: number;
+  /** Metadata for mapped fields, including picklist allowed values */
+  fieldMetadata?: Partial<Record<FieldPurpose, FieldMetadata>>;
 }
 
 /**

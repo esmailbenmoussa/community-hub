@@ -145,8 +145,9 @@ export const REQUIRED_DISCUSSION_FIELDS: RequiredFieldDefinition[] = [
     displayName: 'Category',
     expectedType: ['string', 'picklistString'],
     isRequired: true,
-    allowedValues: ['Announcements', 'General', 'Ideas', 'Help'],
-    description: 'Discussion category (Announcements, General, Ideas, Help)',
+    // Note: allowedValues are dynamic and loaded from ADO picklist field configuration
+    // Default values suggested for new setups: 'Announcements', 'General', 'Ideas', 'Help'
+    description: 'Discussion category (loaded dynamically from ADO picklist)',
   },
   {
     referenceName: 'Custom.Visibility',

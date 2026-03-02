@@ -16,6 +16,7 @@ import {
   DiscoveredField,
   FieldValidationResult,
   AutoMatchResult,
+  FieldMetadata,
   FIELD_REQUIREMENTS,
   DEFAULT_FIELD_PATTERNS,
   REQUIRED_FIELD_PURPOSES,
@@ -113,6 +114,11 @@ export class FieldMappingService {
   /** Cached mapping configuration */
   private cachedMapping: FieldMappingConfig | null = null;
 
+  /** Cached field metadata (including picklist allowed values) */
+  private cachedFieldMetadata: Partial<
+    Record<FieldPurpose, FieldMetadata>
+  > | null = null;
+
   /**
    * Initialize the service with the current project context
    */
@@ -144,6 +150,7 @@ export class FieldMappingService {
         try {
           const parsed = JSON.parse(stored) as StoredFieldMapping;
           this.cachedMapping = parsed.config;
+          this.cachedFieldMetadata = parsed.fieldMetadata ?? null;
           return parsed;
         } catch {
           return null;
@@ -173,6 +180,7 @@ export class FieldMappingService {
 
       if (result) {
         this.cachedMapping = result.config;
+        this.cachedFieldMetadata = result.fieldMetadata ?? null;
       }
 
       return result ?? null;
@@ -187,11 +195,18 @@ export class FieldMappingService {
 
   /**
    * Save field mapping to Extension Data Service
+   * @param config The field mapping configuration
+   * @param processId The process ID
+   * @param availableFields Optional discovered fields to extract metadata from
    */
   async saveMapping(
     config: FieldMappingConfig,
-    processId: string
+    processId: string,
+    availableFields?: DiscoveredField[]
   ): Promise<void> {
+    // Build field metadata from available fields
+    const fieldMetadata = this.buildFieldMetadata(config, availableFields);
+
     if (isDevMode()) {
       const stored: StoredFieldMapping = {
         config,
@@ -199,9 +214,11 @@ export class FieldMappingService {
         processId,
         savedAt: new Date().toISOString(),
         version: FIELD_MAPPING_VERSION,
+        fieldMetadata,
       };
       localStorage.setItem(DEV_STORAGE_KEY, JSON.stringify(stored));
       this.cachedMapping = config;
+      this.cachedFieldMetadata = fieldMetadata ?? null;
       console.log('[FieldMappingService] Dev mode - saved to localStorage');
       return;
     }
@@ -226,6 +243,7 @@ export class FieldMappingService {
         processId,
         savedAt: new Date().toISOString(),
         version: FIELD_MAPPING_VERSION,
+        fieldMetadata,
       };
 
       await dataManager.setValue(
@@ -235,11 +253,51 @@ export class FieldMappingService {
       );
 
       this.cachedMapping = config;
+      this.cachedFieldMetadata = fieldMetadata ?? null;
       console.log('[FieldMappingService] Saved field mapping to EDS');
     } catch (error) {
       console.error('[FieldMappingService] Error saving field mapping:', error);
       throw error;
     }
+  }
+
+  /**
+   * Build field metadata from discovered fields based on the mapping config.
+   * Extracts allowedValues for picklist fields.
+   */
+  private buildFieldMetadata(
+    config: FieldMappingConfig,
+    availableFields?: DiscoveredField[]
+  ): Partial<Record<FieldPurpose, FieldMetadata>> | undefined {
+    if (!availableFields || availableFields.length === 0) {
+      return undefined;
+    }
+
+    const metadata: Partial<Record<FieldPurpose, FieldMetadata>> = {};
+
+    for (const purpose of ALL_FIELD_PURPOSES) {
+      const fieldRefName = config.mappings[purpose];
+      if (!fieldRefName) continue;
+
+      const field = availableFields.find(
+        (f) => f.referenceName === fieldRefName
+      );
+      if (!field) continue;
+
+      // Only store metadata for picklist fields with allowed values
+      if (
+        field.isPicklist &&
+        field.allowedValues &&
+        field.allowedValues.length > 0
+      ) {
+        metadata[purpose] = {
+          allowedValues: field.allowedValues,
+          displayName: field.name,
+        };
+      }
+    }
+
+    return Object.keys(metadata).length > 0 ? metadata : undefined;
   }
 
   /**
@@ -474,6 +532,41 @@ export class FieldMappingService {
    */
   clearCache(): void {
     this.cachedMapping = null;
+    this.cachedFieldMetadata = null;
+  }
+
+  /**
+   * Get the allowed values for a specific field purpose (e.g., Category).
+   * Returns undefined if the field is not a picklist or has no stored values.
+   */
+  getFieldAllowedValues(purpose: FieldPurpose): string[] | undefined {
+    return this.cachedFieldMetadata?.[purpose]?.allowedValues;
+  }
+
+  /**
+   * Get category options from the stored field metadata.
+   * Returns the allowed values from the ADO picklist, or undefined if not available.
+   */
+  getCategoryOptions(): string[] | undefined {
+    return this.getFieldAllowedValues(FieldPurpose.Category);
+  }
+
+  /**
+   * Get the cached field metadata.
+   * Returns null if not loaded.
+   */
+  getFieldMetadata(): Partial<Record<FieldPurpose, FieldMetadata>> | null {
+    return this.cachedFieldMetadata;
+  }
+
+  /**
+   * Check if field metadata is available (i.e., picklist values are cached).
+   */
+  hasFieldMetadata(): boolean {
+    return (
+      this.cachedFieldMetadata !== null &&
+      Object.keys(this.cachedFieldMetadata).length > 0
+    );
   }
 
   /**

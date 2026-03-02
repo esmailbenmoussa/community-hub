@@ -12,6 +12,7 @@ import {
   DISCUSSION_FIELDS,
   SortOption,
   DiscussionFilters,
+  CategoryValue,
   Category,
   VisibilityScope,
 } from '@/types';
@@ -507,16 +508,14 @@ function escapeString(value: string): string {
 }
 
 /**
- * Parse a Category enum value from string
+ * Parse a Category value from string.
+ * Now returns the string as-is since categories are dynamic.
+ * Falls back to 'General' if no value provided.
  */
-export function parseCategory(value: string | undefined): Category {
+export function parseCategory(value: string | undefined): CategoryValue {
   if (!value) return Category.General;
-
-  const normalized = value as Category;
-  if (Object.values(Category).includes(normalized)) {
-    return normalized;
-  }
-  return Category.General;
+  // Return the value as-is - it may be a default category or a custom one from ADO picklist
+  return value;
 }
 
 /**

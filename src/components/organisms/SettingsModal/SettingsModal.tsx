@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { version } from '../../../../vss-extension.json';
 import { validationService } from '@/services/validation.service';
 import { categorySettingsService } from '@/services/categorySettings.service';
@@ -17,14 +17,17 @@ import { CategorySettingsRow } from '@/components/molecules/CategorySettingsRow'
 import {
   categorySettingsAtom,
   categorySettingsLoadedAtom,
+  availableCategoriesAtom,
 } from '@/store/categorySettingsAtom';
 import {
   PAGE_SIZE_OPTIONS,
   DEFAULT_USER_PREFERENCES,
-  Category,
+  DEFAULT_CATEGORIES,
+  CategoryValue,
   CategorySettings,
   CategorySetting,
 } from '@/types';
+import { getCategorySetting } from '@/types/categorySettings';
 
 /** View state for the modal */
 type SettingsView = 'settings' | 'fieldMapping';
@@ -128,6 +131,11 @@ export function SettingsModal({
   const [categorySettingsLoaded, setCategorySettingsLoaded] = useAtom(
     categorySettingsLoadedAtom
   );
+  // Available categories from ADO picklist (or default to built-in categories)
+  const availableCategories = useAtomValue(availableCategoriesAtom);
+  const categoriesToShow =
+    availableCategories.length > 0 ? availableCategories : DEFAULT_CATEGORIES;
+
   const [localCategorySettings, setLocalCategorySettings] =
     useState<CategorySettings>(globalCategorySettings);
   const [savingCategorySettings, setSavingCategorySettings] = useState(false);
@@ -280,7 +288,7 @@ export function SettingsModal({
 
   // Handle category setting change
   const handleCategorySettingChange = useCallback(
-    (category: Category, setting: CategorySetting) => {
+    (category: CategoryValue, setting: CategorySetting) => {
       setLocalCategorySettings((prev) => ({
         ...prev,
         [category]: setting,
@@ -452,11 +460,14 @@ export function SettingsModal({
                       Customize icons and colors for each category
                     </p>
                     <div className="space-y-2">
-                      {Object.values(Category).map((category) => (
+                      {categoriesToShow.map((category) => (
                         <CategorySettingsRow
                           key={category}
                           category={category}
-                          setting={localCategorySettings[category]}
+                          setting={getCategorySetting(
+                            category,
+                            localCategorySettings
+                          )}
                           onChange={(setting) =>
                             handleCategorySettingChange(category, setting)
                           }
