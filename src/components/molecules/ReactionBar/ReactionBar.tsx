@@ -31,8 +31,10 @@ export function ReactionBar({
   disabled = false,
   className = '',
 }: ReactionBarProps) {
-  // Sort reactions by count (highest first)
-  const sortedReactions = [...reactions].sort((a, b) => b.count - a.count);
+  // Filter out reactions with 0 count and sort by count (highest first)
+  const sortedReactions = [...reactions]
+    .filter((r) => r.count > 0)
+    .sort((a, b) => b.count - a.count);
 
   return (
     <div className={`flex flex-wrap items-center gap-1 ${className}`}>
