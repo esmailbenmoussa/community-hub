@@ -1,10 +1,8 @@
-# Community Hub
-
 ## The home for team conversations in Azure DevOps
 
 Ask questions, share announcements, upvote ideas, and comment—all right next to your work. Community Hub enables healthy and productive team collaboration within Azure DevOps.
 
-[Get Started](docs/ADMIN_SETUP_GUIDE.md) · [Documentation](docs/REQUIREMENTS.md) · [Report Issue](https://marketplace.visualstudio.com/items?itemName=Repryl.community-hub&ssr=false#qna)
+[Get Started](#quick-start) · [Report Issue](https://marketplace.visualstudio.com/items?itemName=Repryl.community-hub&ssr=false#qna)
 
 ![Community Hub - Discussion interface showing categorized threads with upvotes, labels, and pinned announcements](public/screenshots/intro.png)
 
