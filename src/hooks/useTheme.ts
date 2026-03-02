@@ -118,7 +118,7 @@ export const useTheme = () => {
     if (isDevMode()) {
       // In dev mode, check system preference
       const prefersDark = window.matchMedia(
-        '(prefers-color-scheme: dark)'
+        '(prefers-color-scheme: light)'
       ).matches;
       setTheme(prefersDark ? 'dark' : 'light');
 
