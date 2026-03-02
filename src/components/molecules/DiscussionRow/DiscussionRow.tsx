@@ -28,8 +28,7 @@ export function DiscussionRow({
   onClick,
   voteDisabled = false,
 }: DiscussionRowProps) {
-  const handleVoteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleVoteClick = () => {
     onVote(discussion.id);
   };
 
@@ -53,11 +52,11 @@ export function DiscussionRow({
       className="flex cursor-pointer gap-4 rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
     >
       {/* Vote button */}
-      <div className="flex-shrink-0" onClick={handleVoteClick}>
+      <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         <VoteButton
           count={discussion.voteCount}
           hasVoted={hasVoted}
-          onVote={() => onVote(discussion.id)}
+          onVote={handleVoteClick}
           disabled={voteDisabled}
         />
       </div>
