@@ -9,13 +9,62 @@
  * });
  */
 
-import type { Plugin } from "vite";
+import type { Plugin } from 'vite';
+import { readFileSync } from 'fs';
 
 interface AmdToEsmOptions {
   /** Glob pattern for files to include */
   include?: RegExp;
-  /** Module ID rewrites */
-  rewire?: (moduleId: string, parentPath: string) => string;
+}
+
+/**
+ * Resolve a module import path relative to the file being transformed.
+ * Converts relative paths to package-absolute paths for browser compatibility.
+ *
+ * @param moduleId - The import path (e.g., './Fetch', '../Utils')
+ * @param filePath - The full path of the file being transformed
+ * @returns Resolved import path (e.g., 'azure-devops-extension-api/Common/Fetch')
+ */
+function resolveImportPath(moduleId: string, filePath: string): string {
+  // External packages - return as-is
+  if (moduleId === 'azure-devops-extension-sdk') {
+    return 'azure-devops-extension-sdk';
+  }
+  if (moduleId === 'whatwg-fetch') {
+    return 'whatwg-fetch';
+  }
+
+  // For relative paths, resolve to package-absolute paths
+  if (moduleId.startsWith('./') || moduleId.startsWith('../')) {
+    // Check if this is a file from azure-devops-extension-api
+    const packageMatch = filePath.match(
+      /azure-devops-extension-api[\/\\](.+)$/
+    );
+    if (packageMatch) {
+      // Get the directory of the current file within the package
+      const filePathInPackage = packageMatch[1]; // e.g., "Common/RestClientBase.js"
+      const dirInPackage = filePathInPackage.replace(/[\/\\][^\/\\]+$/, ''); // e.g., "Common"
+
+      // Resolve the relative path
+      const parts = dirInPackage.split(/[\/\\]/);
+      const moduleParts = moduleId.split('/');
+
+      for (const part of moduleParts) {
+        if (part === '.') {
+          continue;
+        } else if (part === '..') {
+          parts.pop();
+        } else {
+          parts.push(part);
+        }
+      }
+
+      return `azure-devops-extension-api/${parts.join('/')}`;
+    }
+  }
+
+  // For non-relative paths, return as-is
+  return moduleId;
 }
 
 /**
@@ -53,13 +102,13 @@ function parseAmdModule(code: string): {
 
   // Parse dependencies array
   const deps = depsStr
-    .split(",")
-    .map((d) => d.trim().replace(/^["']|["']$/g, ""))
+    .split(',')
+    .map((d) => d.trim().replace(/^["']|["']$/g, ''))
     .filter((d) => d.length > 0);
 
   // Parse parameter names
   const params = paramsStr
-    .split(",")
+    .split(',')
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
 
@@ -69,11 +118,7 @@ function parseAmdModule(code: string): {
 /**
  * Convert AMD module to ESM
  */
-function convertAmdToEsm(
-  code: string,
-  filePath: string,
-  options: AmdToEsmOptions,
-): string {
+function convertAmdToEsm(code: string, filePath: string): string {
   const parsed = parseAmdModule(code);
   if (!parsed) {
     // Not an AMD module or can't parse it, return as-is
@@ -81,7 +126,6 @@ function convertAmdToEsm(
   }
 
   const { preamble, deps, params, body } = parsed;
-  const rewire = options.rewire || ((id: string) => id);
 
   const imports: string[] = [];
   const paramToImport: Map<string, string> = new Map();
@@ -92,12 +136,12 @@ function convertAmdToEsm(
     const param = params[i];
 
     // Skip "require" and "exports" - they're handled specially
-    if (dep === "require" || dep === "exports") {
+    if (dep === 'require' || dep === 'exports') {
       continue;
     }
 
-    // Rewire the module ID
-    const resolvedDep = rewire(dep, filePath);
+    // Resolve the module import path
+    const resolvedDep = resolveImportPath(dep, filePath);
 
     // Generate unique import name based on param
     if (param) {
@@ -110,12 +154,12 @@ function convertAmdToEsm(
   let processedBody = body;
 
   // Handle "use strict" - we'll add it at the top
-  processedBody = processedBody.replace(/^\s*["']use strict["']\s*;?\s*/m, "");
+  processedBody = processedBody.replace(/^\s*["']use strict["']\s*;?\s*/m, '');
 
   // Handle Object.defineProperty(exports, "__esModule", { value: true });
   processedBody = processedBody.replace(
     /Object\.defineProperty\s*\(\s*exports\s*,\s*["']__esModule["']\s*,\s*\{\s*value\s*:\s*true\s*\}\s*\)\s*;?/g,
-    "",
+    ''
   );
 
   // Handle __exportStar pattern (TypeScript's export * helper)
@@ -124,18 +168,18 @@ function convertAmdToEsm(
     /__exportStar\s*\(\s*(\w+)\s*,\s*exports\s*\)\s*;?/g,
     (_match, moduleParam) => {
       return `export * from '${paramToImport.get(moduleParam) || moduleParam}';`;
-    },
+    }
   );
 
   // Handle __export pattern used in index files
   // function __export(m) { for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p]; }
   // __export(Module_1);
-  const hasExportHelper = processedBody.includes("function __export");
+  const hasExportHelper = processedBody.includes('function __export');
   if (hasExportHelper) {
     // Remove the __export helper function definition
     processedBody = processedBody.replace(
       /function\s+__export\s*\(\s*\w+\s*\)\s*\{[\s\S]*?\}\s*/g,
-      "",
+      ''
     );
 
     // Convert __export(param) calls to export * from 'module'
@@ -143,11 +187,11 @@ function convertAmdToEsm(
     for (const [param, modulePath] of entries) {
       const exportCallRegex = new RegExp(
         `__export\\s*\\(\\s*${param}\\s*\\)\\s*;?`,
-        "g",
+        'g'
       );
       processedBody = processedBody.replace(
         exportCallRegex,
-        `export * from '${modulePath}';`,
+        `export * from '${modulePath}';`
       );
     }
   }
@@ -159,21 +203,21 @@ function convertAmdToEsm(
     /var\s+(\w+)\s*;\s*\(function\s*\(\1\)\s*\{([\s\S]*?)\}\)\s*\(\s*\1\s*=\s*exports\.\1\s*\|\|\s*\(exports\.\1\s*=\s*\{\}\)\s*\)\s*;?/g,
     (_match, enumName, enumBody) => {
       return `export var ${enumName};\n(function (${enumName}) {${enumBody}})(${enumName} || (${enumName} = {}));`;
-    },
+    }
   );
 
   // Handle var X = exports.X = ... pattern (TypeScript enum/class exports)
   // This must come before simpler exports patterns
   processedBody = processedBody.replace(
     /var\s+(\w+)\s*=\s*exports\.\1\s*=/g,
-    "export var $1 =",
+    'export var $1 ='
   );
 
   // Handle exports.X = X; pattern (simple re-export of same name)
   // Must be specific to avoid matching partial patterns
   processedBody = processedBody.replace(
     /exports\.(\w+)\s*=\s*\1\s*;/g,
-    "export { $1 };",
+    'export { $1 };'
   );
 
   // Handle exports.X = Y; pattern (re-export with different name)
@@ -184,7 +228,7 @@ function convertAmdToEsm(
         return `export { ${exportName} };`;
       }
       return `export { ${value} as ${exportName} };`;
-    },
+    }
   );
 
   // Handle exports.X = expression (more complex case like function assignments)
@@ -192,23 +236,23 @@ function convertAmdToEsm(
   // Using negative lookahead to avoid matching enum patterns
   processedBody = processedBody.replace(
     /exports\.(\w+)\s*=\s*(?!exports\.|\w+\s*;)([^;]+;)/g,
-    "export const $1 = $2",
+    'export const $1 = $2'
   );
 
   // Build final ESM code
-  let result = "";
+  let result = '';
 
   // Add preamble (TypeScript helpers like __extends, __awaiter, __generator)
   // These are defined outside the define() block and need to be preserved
   if (preamble) {
     // Remove any license comments at the start (they can stay but let's clean up)
     // Keep the helper functions
-    result += preamble + "\n\n";
+    result += preamble + '\n\n';
   }
 
   // Add imports at the top (after preamble since helpers don't depend on imports)
   if (imports.length > 0) {
-    result += imports.join("\n") + "\n\n";
+    result += imports.join('\n') + '\n\n';
   }
 
   // Add processed body
@@ -227,10 +271,10 @@ function convertAmdToEsm(
   const modulesToRemove = Array.from(exportStarModules);
   for (const modulePath of modulesToRemove) {
     const importRegex = new RegExp(
-      `import \\* as \\w+ from ['"]${modulePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}['"];?\\n?`,
-      "g",
+      `import \\* as \\w+ from ['"]${modulePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"];?\\n?`,
+      'g'
     );
-    result = result.replace(importRegex, "");
+    result = result.replace(importRegex, '');
   }
 
   return result;
@@ -238,38 +282,47 @@ function convertAmdToEsm(
 
 /**
  * Vite plugin to convert AMD modules to ESM
+ *
+ * Uses the `load` hook instead of `transform` because:
+ * 1. `load` runs earlier in Vite's pipeline (before transform)
+ * 2. By providing content in `load`, Vite never sees the original AMD code
+ * 3. This prevents race conditions where Vite might analyze exports before transformation
  */
 export function amdToEsm(options: AmdToEsmOptions = {}): Plugin {
   const include = options.include || /azure-devops-extension-api/;
 
   return {
-    name: "vite-plugin-amd-to-esm",
-    enforce: "pre",
+    name: 'vite-plugin-amd-to-esm',
+    enforce: 'pre',
 
-    transform(code: string, id: string) {
+    load(id: string) {
       // Only process files matching the include pattern
       if (!include.test(id)) {
         return null;
       }
 
-      // Only process JS files
-      if (!id.endsWith(".js")) {
-        return null;
-      }
-
-      // Check if this looks like an AMD module
-      if (!code.includes("define(")) {
+      // Only process JS files (handle query strings like ?v=xxx)
+      const cleanId = id.split('?')[0];
+      if (!cleanId.endsWith('.js')) {
         return null;
       }
 
       try {
-        const transformed = convertAmdToEsm(code, id, options);
+        // Read the file content ourselves
+        const code = readFileSync(cleanId, 'utf-8');
+
+        // Check if this looks like an AMD module
+        if (!code.includes('define(')) {
+          return null;
+        }
+
+        const transformed = convertAmdToEsm(code, cleanId);
         return {
           code: transformed,
-          map: null, // We could generate source maps but skip for now
+          map: null,
         };
       } catch (error) {
-        console.error(`[amd-to-esm] Failed to transform ${id}:`, error);
+        console.error(`[amd-to-esm] Failed to load/transform ${id}:`, error);
         return null;
       }
     },

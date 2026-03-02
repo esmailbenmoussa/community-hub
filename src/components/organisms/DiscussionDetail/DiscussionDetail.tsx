@@ -17,6 +17,7 @@ import { Avatar } from '@/components/atoms/Avatar';
 import { TimeAgo } from '@/components/atoms/TimeAgo';
 import { VoteButton } from '@/components/atoms/VoteButton';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
+import { ProjectBadge } from '@/components/atoms/ProjectBadge';
 import { MarkdownRenderer } from '@/components/atoms/MarkdownRenderer';
 import { Select } from '@/components/atoms/Select';
 import { CommentCard } from '@/components/molecules/CommentCard';
@@ -68,6 +69,8 @@ interface DiscussionDetailProps {
   voteDisabled?: boolean;
   /** Whether a discussion update is in progress */
   discussionUpdating?: boolean;
+  /** Current project name - used to determine if origin badge should be shown */
+  currentProjectName?: string;
 }
 
 /**
@@ -163,6 +166,7 @@ export function DiscussionDetail({
   commentActionPending = false,
   voteDisabled = false,
   discussionUpdating = false,
+  currentProjectName,
 }: DiscussionDetailProps) {
   // Comment sort state
   const [commentSort, setCommentSort] = useState<CommentSortOrder>('newest');
@@ -377,8 +381,15 @@ export function DiscussionDetail({
           {/* Discussion header */}
           <div className="mb-6">
             {/* Category badge - visible on mobile only */}
-            <div className="mb-3 lg:hidden">
+            <div className="mb-3 flex flex-wrap items-center gap-2 lg:hidden">
               <CategoryBadge category={discussion.category} size="sm" />
+              {currentProjectName &&
+                discussion.projectName !== currentProjectName && (
+                  <ProjectBadge
+                    projectName={discussion.projectName}
+                    size="sm"
+                  />
+                )}
             </div>
 
             {/* Title - editable or static */}
@@ -669,6 +680,17 @@ export function DiscussionDetail({
             </h3>
             <CategoryBadge category={discussion.category} size="md" />
           </div>
+
+          {/* Project Origin Section - only shown for cross-project discussions */}
+          {currentProjectName &&
+            discussion.projectName !== currentProjectName && (
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-secondary">
+                  Project
+                </h3>
+                <ProjectBadge projectName={discussion.projectName} size="md" />
+              </div>
+            )}
 
           {/* Tags Section */}
           {discussion.tags.length > 0 && (

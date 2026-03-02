@@ -13,7 +13,7 @@ import { CommentReactionType, UpdateDiscussionInput } from '@/types';
 export function DiscussionPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAzureDevOps();
+  const { user, projectName } = useAzureDevOps();
 
   const discussionId = id ? parseInt(id, 10) : 0;
 
@@ -171,6 +171,7 @@ export function DiscussionPage() {
           commentsLoading={commentsLoading}
           commentActionPending={commentSubmitting}
           discussionUpdating={discussionUpdating}
+          currentProjectName={projectName}
         />
       )}
 

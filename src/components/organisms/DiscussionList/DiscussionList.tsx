@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Discussion } from '@/types';
 import { DiscussionRow } from '@/components/molecules/DiscussionRow';
 import { Pagination } from '@/components/atoms/Pagination';
+import { useAzureDevOps } from '@/hooks/useAzureDevOps';
 
 interface DiscussionListProps {
   /** List of discussions to display */
@@ -87,6 +88,7 @@ export function DiscussionList({
   voteDisabled = false,
   emptyMessage = 'No discussions yet. Start a new one!',
 }: DiscussionListProps) {
+  const { projectName: currentProjectName } = useAzureDevOps();
   // Show loading skeletons
   if (isLoading && discussions.length === 0) {
     return (
@@ -120,6 +122,7 @@ export function DiscussionList({
               onVote={onVote}
               onClick={onDiscussionClick}
               voteDisabled={voteDisabled}
+              currentProjectName={currentProjectName}
             />
           </motion.div>
         ))}

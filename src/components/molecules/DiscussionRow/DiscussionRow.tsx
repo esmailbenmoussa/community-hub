@@ -1,6 +1,7 @@
 import { Discussion } from '@/types';
 import { VoteButton } from '@/components/atoms/VoteButton';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
+import { ProjectBadge } from '@/components/atoms/ProjectBadge';
 import { Avatar } from '@/components/atoms/Avatar';
 import { TimeAgo } from '@/components/atoms/TimeAgo';
 
@@ -15,6 +16,8 @@ interface DiscussionRowProps {
   onClick: (discussionId: number) => void;
   /** Whether voting is disabled */
   voteDisabled?: boolean;
+  /** Current project name - used to determine if origin badge should be shown */
+  currentProjectName?: string;
 }
 
 /**
@@ -27,6 +30,7 @@ export function DiscussionRow({
   onVote,
   onClick,
   voteDisabled = false,
+  currentProjectName,
 }: DiscussionRowProps) {
   const handleVoteClick = () => {
     onVote(discussion.id);
@@ -65,9 +69,13 @@ export function DiscussionRow({
       <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
         {/* Left side: Category, Title, Meta */}
         <div className="min-w-0">
-          {/* Header row: Category + Pin indicator */}
+          {/* Header row: Category + Project origin + Pin indicator */}
           <div className="mb-1 flex items-center gap-2">
             <CategoryBadge category={discussion.category} size="sm" />
+            {currentProjectName &&
+              discussion.projectName !== currentProjectName && (
+                <ProjectBadge projectName={discussion.projectName} size="sm" />
+              )}
             {discussion.isPinned && (
               <span className="inline-flex items-center gap-1 text-xs text-content-secondary">
                 <svg
