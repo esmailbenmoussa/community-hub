@@ -28,6 +28,9 @@ import {
   KAREN,
   LEO,
 } from '@/mocks/users';
+import * as SDK from 'azure-devops-extension-sdk';
+import { RestClientBase } from 'azure-devops-extension-api/Common/RestClientBase';
+import type { IVssRestClientOptions } from 'azure-devops-extension-api/Common/Context';
 
 /**
  * ADO API response types for comments
@@ -53,15 +56,184 @@ interface CommentsResponse {
 }
 
 /**
- * Dynamically load ADO API client (only in production)
+ * Custom REST client for Work Item Comments API
+ * The standard WorkItemTrackingRestClient doesn't expose addComment, updateComment, deleteComment methods
+ * so we need to make direct REST API calls to the Comments endpoint.
  */
-async function getWorkItemTrackingClient() {
+class WorkItemCommentsRestClient extends RestClientBase {
+  private static readonly API_VERSION = '7.1-preview.4';
+
+  constructor(options: IVssRestClientOptions) {
+    super(options);
+  }
+
+  /**
+   * Get all comments for a work item
+   */
+  async getComments(
+    workItemId: number,
+    project?: string,
+    top?: number,
+    continuationToken?: string
+  ): Promise<CommentsResponse> {
+    return this.beginRequest<CommentsResponse>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      routeTemplate: '{project}/_apis/wit/workItems/{workItemId}/comments',
+      routeValues: { project, workItemId },
+      queryParams: { $top: top, continuationToken },
+    });
+  }
+
+  /**
+   * Get a single comment by ID
+   */
+  async getComment(
+    workItemId: number,
+    commentId: number,
+    project?: string
+  ): Promise<CommentResponse> {
+    return this.beginRequest<CommentResponse>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      routeTemplate:
+        '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}',
+      routeValues: { project, workItemId, commentId },
+    });
+  }
+
+  /**
+   * Add a new comment to a work item
+   */
+  async addComment(
+    workItemId: number,
+    request: { text: string },
+    project?: string
+  ): Promise<CommentResponse> {
+    return this.beginRequest<CommentResponse>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      method: 'POST',
+      routeTemplate: '{project}/_apis/wit/workItems/{workItemId}/comments',
+      routeValues: { project, workItemId },
+      body: request,
+    });
+  }
+
+  /**
+   * Update an existing comment
+   */
+  async updateComment(
+    workItemId: number,
+    commentId: number,
+    request: { text: string },
+    project?: string
+  ): Promise<CommentResponse> {
+    return this.beginRequest<CommentResponse>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      method: 'PATCH',
+      routeTemplate:
+        '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}',
+      routeValues: { project, workItemId, commentId },
+      body: request,
+    });
+  }
+
+  /**
+   * Delete a comment
+   */
+  async deleteComment(
+    workItemId: number,
+    commentId: number,
+    project?: string
+  ): Promise<void> {
+    return this.beginRequest<void>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      method: 'DELETE',
+      routeTemplate:
+        '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}',
+      routeValues: { project, workItemId, commentId },
+    });
+  }
+
+  /**
+   * Add a reaction to a comment
+   */
+  async addCommentReaction(
+    workItemId: number,
+    commentId: number,
+    reactionType: CommentReactionType,
+    project?: string
+  ): Promise<void> {
+    return this.beginRequest<void>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      method: 'PUT',
+      routeTemplate:
+        '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}',
+      routeValues: { project, workItemId, commentId, reactionType },
+    });
+  }
+
+  /**
+   * Remove a reaction from a comment
+   */
+  async deleteCommentReaction(
+    workItemId: number,
+    commentId: number,
+    reactionType: CommentReactionType,
+    project?: string
+  ): Promise<void> {
+    return this.beginRequest<void>({
+      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      method: 'DELETE',
+      routeTemplate:
+        '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}',
+      routeValues: { project, workItemId, commentId, reactionType },
+    });
+  }
+}
+
+/**
+ * Create the Work Item Comments REST client
+ */
+async function getWorkItemCommentsClient(): Promise<WorkItemCommentsRestClient> {
   const { getClient } =
     await import('azure-devops-extension-api/Common/Client');
-  const { WorkItemTrackingRestClient } =
-    await import('azure-devops-extension-api/WorkItemTracking');
+  return getClient(WorkItemCommentsRestClient);
+}
 
-  return getClient(WorkItemTrackingRestClient);
+/**
+ * Retry a function with exponential backoff
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 1000
+): Promise<T> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Don't retry on 4xx client errors (except 429 rate limiting)
+      const statusCode = (error as { status?: number })?.status;
+      if (
+        statusCode &&
+        statusCode >= 400 &&
+        statusCode < 500 &&
+        statusCode !== 429
+      ) {
+        throw lastError;
+      }
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.warn(
+          `[CommentService] Retry attempt ${attempt + 1} after ${delay}ms:`,
+          lastError.message
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
@@ -1481,8 +1653,10 @@ function initMockComments(discussionId: number): Comment[] {
  * Comment Service class
  */
 export class CommentService {
+  private commentsClient: WorkItemCommentsRestClient | null = null;
+  private projectName: string | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private workItemClient: any = null;
+  private workItemClient: any = null; // For WIQL queries only
 
   /**
    * Initialize the service
@@ -1493,14 +1667,23 @@ export class CommentService {
       return;
     }
 
-    this.workItemClient = await getWorkItemTrackingClient();
+    const webContext = SDK.getWebContext();
+    this.projectName = webContext.project?.name || null;
+    this.commentsClient = await getWorkItemCommentsClient();
+
+    // Also get the WorkItemTrackingClient for WIQL queries
+    const { getClient } =
+      await import('azure-devops-extension-api/Common/Client');
+    const { WorkItemTrackingRestClient } =
+      await import('azure-devops-extension-api/WorkItemTracking');
+    this.workItemClient = getClient(WorkItemTrackingRestClient);
   }
 
   /**
    * Ensure service is initialized
    */
   private ensureInitialized(): void {
-    if (!isDevMode() && !this.workItemClient) {
+    if (!isDevMode() && !this.commentsClient) {
       throw new Error(
         'CommentService not initialized. Call initialize() first.'
       );
@@ -1518,8 +1701,12 @@ export class CommentService {
     }
 
     try {
-      const response: CommentsResponse =
-        await this.workItemClient.getComments(discussionId);
+      const response = await withRetry(() =>
+        this.commentsClient!.getComments(
+          discussionId,
+          this.projectName || undefined
+        )
+      );
 
       return (response.comments || []).map((c) =>
         this.mapToComment(c, discussionId)
@@ -1653,10 +1840,12 @@ export class CommentService {
     }
 
     try {
-      const response: CommentResponse = await this.workItemClient.addComment(
-        { text: input.text },
-        undefined, // project (not needed when using work item ID)
-        discussionId
+      const response = await withRetry(() =>
+        this.commentsClient!.addComment(
+          discussionId,
+          { text: input.text },
+          this.projectName || undefined
+        )
       );
 
       return this.mapToComment(response, discussionId);
@@ -1693,11 +1882,13 @@ export class CommentService {
     }
 
     try {
-      const response: CommentResponse = await this.workItemClient.updateComment(
-        { text: input.text },
-        undefined, // project
-        discussionId,
-        commentId
+      const response = await withRetry(() =>
+        this.commentsClient!.updateComment(
+          discussionId,
+          commentId,
+          { text: input.text },
+          this.projectName || undefined
+        )
       );
 
       return this.mapToComment(response, discussionId);
@@ -1723,10 +1914,12 @@ export class CommentService {
     }
 
     try {
-      await this.workItemClient.deleteComment(
-        undefined, // project
-        discussionId,
-        commentId
+      await withRetry(() =>
+        this.commentsClient!.deleteComment(
+          discussionId,
+          commentId,
+          this.projectName || undefined
+        )
       );
     } catch (error) {
       console.error('[CommentService] Error deleting comment:', error);
@@ -1749,10 +1942,12 @@ export class CommentService {
     }
 
     try {
-      const response: CommentResponse = await this.workItemClient.getComment(
-        undefined, // project
-        discussionId,
-        commentId
+      const response = await withRetry(() =>
+        this.commentsClient!.getComment(
+          discussionId,
+          commentId,
+          this.projectName || undefined
+        )
       );
 
       return this.mapToComment(response, discussionId);
@@ -1932,11 +2127,13 @@ export class CommentService {
 
     try {
       // Azure DevOps API: PUT /_apis/wit/workItems/{id}/comments/{commentId}/reactions/{type}
-      await this.workItemClient.addCommentReaction(
-        undefined, // project
-        discussionId,
-        commentId,
-        reactionType
+      await withRetry(() =>
+        this.commentsClient!.addCommentReaction(
+          discussionId,
+          commentId,
+          reactionType,
+          this.projectName || undefined
+        )
       );
     } catch (error) {
       console.error('[CommentService] Error adding reaction:', error);
@@ -1961,11 +2158,13 @@ export class CommentService {
 
     try {
       // Azure DevOps API: DELETE /_apis/wit/workItems/{id}/comments/{commentId}/reactions/{type}
-      await this.workItemClient.deleteCommentReaction(
-        undefined, // project
-        discussionId,
-        commentId,
-        reactionType
+      await withRetry(() =>
+        this.commentsClient!.deleteCommentReaction(
+          discussionId,
+          commentId,
+          reactionType,
+          this.projectName || undefined
+        )
       );
     } catch (error) {
       console.error('[CommentService] Error removing reaction:', error);
