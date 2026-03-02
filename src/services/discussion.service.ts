@@ -77,6 +77,22 @@ async function getWorkItemTrackingClient() {
 }
 
 /**
+ * Convert a field value to boolean.
+ * Handles both native boolean and string values (e.g., "True"/"False", "Yes"/"No").
+ * ADO sometimes reports boolean fields as picklistString in the Process API,
+ * which may store values as strings.
+ */
+function toBooleanValue(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase();
+    return lower === 'true' || lower === 'yes' || lower === '1';
+  }
+  if (typeof value === 'number') return value !== 0;
+  return false;
+}
+
+/**
  * Default page size for discussion lists
  */
 const DEFAULT_PAGE_SIZE = 20;
@@ -740,7 +756,7 @@ export class DiscussionService {
       ? (wiFields[resolvedFields.VoteCount] as number)
       : undefined;
     const isPinnedValue = resolvedFields.IsPinned
-      ? (wiFields[resolvedFields.IsPinned] as boolean)
+      ? toBooleanValue(wiFields[resolvedFields.IsPinned])
       : undefined;
 
     return {

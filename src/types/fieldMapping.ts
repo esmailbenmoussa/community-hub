@@ -135,7 +135,8 @@ export const FIELD_REQUIREMENTS: Record<FieldPurpose, FieldRequirement> = {
     purpose: FieldPurpose.IsPinned,
     displayName: 'Is Pinned',
     description: 'Whether the discussion is pinned to the top',
-    expectedTypes: ['boolean'],
+    // ADO sometimes reports boolean fields as picklistString (type 12) in the Process API
+    expectedTypes: ['boolean', 'picklistString'],
     isRequired: false,
   },
 };
