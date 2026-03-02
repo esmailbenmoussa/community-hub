@@ -93,7 +93,7 @@ Each discussion provides a dedicated space for in-depth conversation:
 ### Installation
 
 1. Install the Community Hub extension from the [Azure DevOps Marketplace](https://marketplace.visualstudio.com/items?itemName=Repryl.community-hub)
-2. Follow the [Admin Setup Guide](docs/ADMIN_SETUP_GUIDE.md) to configure the required `Discussion` work item type
+2. Configure the required `Discussion` work item type
 3. Apply the configured process to your target projects
 4. Access Community Hub from the top-level navigation in your project
 
