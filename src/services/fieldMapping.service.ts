@@ -265,23 +265,40 @@ export class FieldMappingService {
           witRefName
         );
 
-      return fields
-        .filter((f) => f.referenceName?.startsWith('Custom.'))
-        .map((f) => {
-          const fieldType = this.mapAdoFieldType(f.type);
-          return {
-            name: f.name || '',
-            referenceName: f.referenceName || '',
-            type: fieldType,
-            isPicklist:
-              f.isPicklist ||
-              fieldType === 'picklistString' ||
-              fieldType === 'picklistInteger' ||
-              fieldType === 'picklistDouble',
-            allowedValues: f.allowedValues,
-            description: f.description,
-          };
-        });
+      const customFields = fields.filter((f) =>
+        f.referenceName?.startsWith('Custom.')
+      );
+
+      // Debug logging to diagnose field type issues
+      console.log(
+        '[FieldMappingService] Raw ADO fields:',
+        customFields.map((f) => ({
+          name: f.name,
+          referenceName: f.referenceName,
+          type: f.type,
+          typeOfType: typeof f.type,
+          isPicklist: f.isPicklist,
+        }))
+      );
+
+      return customFields.map((f) => {
+        const fieldType = this.mapAdoFieldType(f.type);
+        console.log(
+          `[FieldMappingService] Field "${f.name}" (${f.referenceName}): ADO type=${f.type} (${typeof f.type}) -> mapped to "${fieldType}"`
+        );
+        return {
+          name: f.name || '',
+          referenceName: f.referenceName || '',
+          type: fieldType,
+          isPicklist:
+            f.isPicklist ||
+            fieldType === 'picklistString' ||
+            fieldType === 'picklistInteger' ||
+            fieldType === 'picklistDouble',
+          allowedValues: f.allowedValues,
+          description: f.description,
+        };
+      });
     } catch (error) {
       console.error(
         '[FieldMappingService] Error getting available fields:',
