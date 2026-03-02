@@ -62,6 +62,7 @@ interface CommentsResponse {
  */
 class WorkItemCommentsRestClient extends RestClientBase {
   private static readonly API_VERSION = '7.1-preview.4';
+  private static readonly REACTIONS_API_VERSION = '7.1-preview.1';
 
   constructor(options: IVssRestClientOptions) {
     super(options);
@@ -163,7 +164,7 @@ class WorkItemCommentsRestClient extends RestClientBase {
     project?: string
   ): Promise<void> {
     return this.beginRequest<void>({
-      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      apiVersion: WorkItemCommentsRestClient.REACTIONS_API_VERSION,
       method: 'PUT',
       routeTemplate:
         '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}',
@@ -181,7 +182,7 @@ class WorkItemCommentsRestClient extends RestClientBase {
     project?: string
   ): Promise<void> {
     return this.beginRequest<void>({
-      apiVersion: WorkItemCommentsRestClient.API_VERSION,
+      apiVersion: WorkItemCommentsRestClient.REACTIONS_API_VERSION,
       method: 'DELETE',
       routeTemplate:
         '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}',
