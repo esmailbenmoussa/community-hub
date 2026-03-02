@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "community-hub",
   "publisher": "Repryl",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "name": "Community Hub",
   "description": "Community Hub is the home for team conversations in Azure DevOps. Ask questions, share announcements, upvote ideas, and comment—right next to your work. Enable productive collaboration.",
   "public": false,
