@@ -67,6 +67,16 @@ interface AdoProcessWorkItemTypeField {
 }
 
 /**
+ * Expand level enum for getWorkItemTypeField API.
+ * Mirrors ProcessWorkItemTypeFieldsExpandLevel from ADO API.
+ */
+enum FieldExpandLevel {
+  None = 0,
+  AllowedValues = 1,
+  All = 2,
+}
+
+/**
  * Dynamically load ADO API clients (only in production)
  */
 async function getAdoClients() {
@@ -303,6 +313,10 @@ export class FieldMappingService {
   /**
    * Get available fields from the Discussion Work Item Type.
    * These are the fields that can be mapped to semantic purposes.
+   *
+   * Note: The getAllWorkItemTypeFields API does NOT return allowedValues for picklist fields.
+   * We must make additional calls to getWorkItemTypeField with expand=AllowedValues for each
+   * picklist field to get their allowed values.
    */
   async getAvailableFields(
     processId: string,
@@ -317,13 +331,15 @@ export class FieldMappingService {
     }
 
     try {
+      // Step 1: Get all fields (without allowedValues for picklists)
       const fields: AdoProcessWorkItemTypeField[] =
         await this.processClient.getAllWorkItemTypeFields(
           processId,
           witRefName
         );
 
-      return fields
+      // Step 2: Map to DiscoveredField and identify picklist fields
+      const customFields = fields
         .filter((f) => f.referenceName?.startsWith('Custom.'))
         .map((f) => {
           const fieldType = this.mapAdoFieldType(f.type);
@@ -340,6 +356,51 @@ export class FieldMappingService {
             description: f.description,
           };
         });
+
+      // Step 3: For picklist fields, fetch allowedValues using individual field API with expand
+      const picklistFields = customFields.filter(
+        (f) =>
+          f.isPicklist && (!f.allowedValues || f.allowedValues.length === 0)
+      );
+
+      if (picklistFields.length > 0) {
+        console.log(
+          `[FieldMappingService] Fetching allowedValues for ${picklistFields.length} picklist field(s)...`
+        );
+
+        // Fetch allowedValues for each picklist field in parallel
+        const picklistPromises = picklistFields.map(async (field) => {
+          try {
+            const detailedField: AdoProcessWorkItemTypeField =
+              await this.processClient.getWorkItemTypeField(
+                processId,
+                witRefName,
+                field.referenceName,
+                FieldExpandLevel.AllowedValues // Expand to include allowedValues
+              );
+
+            if (
+              detailedField.allowedValues &&
+              detailedField.allowedValues.length > 0
+            ) {
+              field.allowedValues = detailedField.allowedValues;
+              console.log(
+                `[FieldMappingService] Got allowedValues for ${field.name}:`,
+                detailedField.allowedValues
+              );
+            }
+          } catch (err) {
+            console.warn(
+              `[FieldMappingService] Failed to get allowedValues for ${field.name}:`,
+              err
+            );
+          }
+        });
+
+        await Promise.all(picklistPromises);
+      }
+
+      return customFields;
     } catch (error) {
       console.error(
         '[FieldMappingService] Error getting available fields:',
