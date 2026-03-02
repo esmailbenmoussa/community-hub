@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAtom } from 'jotai';
-import { version } from '../../../../package.json';
+import { version } from '../../../../vss-extension.json';
 import { validationService } from '@/services/validation.service';
 import { categorySettingsService } from '@/services/categorySettings.service';
 import { useFieldMapping } from '@/hooks/useFieldMapping';

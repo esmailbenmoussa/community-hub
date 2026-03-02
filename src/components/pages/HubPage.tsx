@@ -28,7 +28,7 @@ import {
   categorySettingsAtom,
   categorySettingsLoadedAtom,
 } from '@/store/categorySettingsAtom';
-import { version } from '../../../package.json';
+import { version } from '../../../vss-extension.json';
 
 export function HubPage() {
   const navigate = useNavigate();
