@@ -6,23 +6,22 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom } from 'jotai';
 import { version } from '../../../../vss-extension.json';
 import { validationService } from '@/services/validation.service';
 import { categorySettingsService } from '@/services/categorySettings.service';
 import { useFieldMapping } from '@/hooks/useFieldMapping';
+import { useCategories } from '@/hooks/useCategories';
 import { FieldMappingWizard } from '@/components/organisms/FieldMappingWizard/FieldMappingWizard';
 import { Select, SelectOption } from '@/components/atoms/Select';
 import { CategorySettingsRow } from '@/components/molecules/CategorySettingsRow';
 import {
   categorySettingsAtom,
   categorySettingsLoadedAtom,
-  availableCategoriesAtom,
 } from '@/store/categorySettingsAtom';
 import {
   PAGE_SIZE_OPTIONS,
   DEFAULT_USER_PREFERENCES,
-  DEFAULT_CATEGORIES,
   CategoryValue,
   CategorySettings,
   CategorySetting,
@@ -131,10 +130,9 @@ export function SettingsModal({
   const [categorySettingsLoaded, setCategorySettingsLoaded] = useAtom(
     categorySettingsLoadedAtom
   );
-  // Available categories from ADO picklist (or default to built-in categories)
-  const availableCategories = useAtomValue(availableCategoriesAtom);
-  const categoriesToShow =
-    availableCategories.length > 0 ? availableCategories : DEFAULT_CATEGORIES;
+
+  // Use useCategories hook to get dynamic categories from ADO picklist
+  const { categories: categoriesToShow } = useCategories();
 
   const [localCategorySettings, setLocalCategorySettings] =
     useState<CategorySettings>(globalCategorySettings);

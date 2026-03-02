@@ -20,6 +20,7 @@ import {
 } from '@/store/categorySettingsAtom';
 import { fieldMappingService } from '@/services/fieldMapping.service';
 import { categorySettingsService } from '@/services/categorySettings.service';
+import { validationService } from '@/services/validation.service';
 
 /**
  * Return type for the useCategories hook
@@ -48,8 +49,9 @@ export interface UseCategoriesResult {
  *
  * This hook:
  * 1. Attempts to load categories from the stored field mapping metadata
- * 2. Falls back to default categories if no picklist values are available
- * 3. Provides category settings with fallback styling for unknown categories
+ * 2. If metadata is missing (legacy installation), attempts migration
+ * 3. Falls back to default categories if no picklist values are available
+ * 4. Provides category settings with fallback styling for unknown categories
  *
  * @returns Object with categories, loading state, and utility functions
  */
@@ -74,7 +76,26 @@ export function useCategories(): UseCategoriesResult {
     setError(undefined);
 
     try {
-      // Try to get categories from field mapping service
+      // Ensure field mapping is loaded first (populates the cache with field metadata)
+      const storedMapping = await fieldMappingService.loadMapping();
+
+      // Check if we need to migrate (mapping exists but no metadata)
+      if (storedMapping && !fieldMappingService.hasFieldMetadata()) {
+        console.log(
+          '[useCategories] Field mapping exists but metadata is missing. Attempting migration...'
+        );
+
+        // Load setup status to get processId and witReferenceName for migration
+        const setupStatus = await validationService.loadSetupStatus();
+        if (setupStatus?.processId && setupStatus?.witReferenceName) {
+          await fieldMappingService.migrateFieldMetadata(
+            setupStatus.processId,
+            setupStatus.witReferenceName
+          );
+        }
+      }
+
+      // Now try to get categories from field mapping service
       const picklistCategories = fieldMappingService.getCategoryOptions();
 
       if (picklistCategories && picklistCategories.length > 0) {

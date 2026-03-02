@@ -219,7 +219,8 @@ export function useFieldMapping({
         mappings: currentMappings,
       };
 
-      await fieldMappingService.saveMapping(config, processId);
+      // Pass availableFields to extract and store field metadata (including picklist allowedValues)
+      await fieldMappingService.saveMapping(config, processId, availableFields);
       return true;
     } catch (err) {
       console.error('[useFieldMapping] Error saving mapping:', err);
@@ -230,7 +231,7 @@ export function useFieldMapping({
     } finally {
       setIsSaving(false);
     }
-  }, [canSave, currentMappings, processId]);
+  }, [canSave, currentMappings, processId, availableFields]);
 
   // Reset to initial state
   const reset = useCallback(() => {

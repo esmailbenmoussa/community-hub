@@ -528,6 +528,66 @@ export class FieldMappingService {
   }
 
   /**
+   * Migrate existing field mapping to include field metadata.
+   * This is needed for installations that saved field mappings before
+   * the fieldMetadata feature was added.
+   *
+   * @param processId - The process ID to fetch fields from
+   * @param witRefName - The Work Item Type reference name
+   * @returns true if migration was performed, false if not needed
+   */
+  async migrateFieldMetadata(
+    processId: string,
+    witRefName: string
+  ): Promise<boolean> {
+    // Check if we have a mapping but no metadata
+    if (!this.cachedMapping) {
+      console.log('[FieldMappingService] No mapping to migrate');
+      return false;
+    }
+
+    if (this.hasFieldMetadata()) {
+      console.log('[FieldMappingService] Field metadata already exists');
+      return false;
+    }
+
+    console.log(
+      '[FieldMappingService] Migrating field mapping to include metadata...'
+    );
+
+    try {
+      // Fetch available fields from ADO
+      const availableFields = await this.getAvailableFields(
+        processId,
+        witRefName
+      );
+
+      // Build and store metadata
+      const metadata = this.buildFieldMetadata(
+        this.cachedMapping,
+        availableFields
+      );
+
+      if (metadata && Object.keys(metadata).length > 0) {
+        // Re-save the mapping with the new metadata
+        await this.saveMapping(this.cachedMapping, processId, availableFields);
+        console.log(
+          '[FieldMappingService] Migration complete. Field metadata saved.'
+        );
+        return true;
+      } else {
+        console.log(
+          '[FieldMappingService] No picklist fields found to migrate'
+        );
+        return false;
+      }
+    } catch (error) {
+      console.error('[FieldMappingService] Migration failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Clear the cached mapping (useful for re-running setup).
    */
   clearCache(): void {
