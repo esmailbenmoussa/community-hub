@@ -33,25 +33,31 @@ import { mockAvailableFields } from '@/mocks';
 const DEV_STORAGE_KEY = 'community-hub-field-mapping';
 
 /**
- * ADO Field Type enum values.
- * The ADO API sometimes returns numeric values instead of string names.
+ * ADO Field Type enum values (from FieldType enum in ADO API).
+ * The ADO API returns numeric values for field types.
  * This map converts those numeric values to our FieldType strings.
+ *
+ * Based on: https://learn.microsoft.com/en-us/rest/api/azure/devops/processes/fields
+ * FieldType enum:
+ *   String = 1, Integer = 2, DateTime = 3, PlainText = 5, Html = 7,
+ *   TreePath = 8, History = 9, Double = 10, Guid = 11, Boolean = 12,
+ *   Identity = 13, PicklistInteger = 14, PicklistString = 15, PicklistDouble = 16
  */
 const ADO_FIELD_TYPE_MAP: Record<number, FieldType> = {
   1: 'string',
   2: 'integer',
   3: 'dateTime',
-  4: 'plainText',
-  5: 'html',
-  6: 'treePath',
-  7: 'html', // history - treat as html
-  8: 'double',
-  9: 'string', // guid - treat as string
-  10: 'boolean',
-  11: 'identity',
-  12: 'picklistString',
-  13: 'picklistInteger',
-  14: 'picklistDouble',
+  5: 'plainText',
+  7: 'html',
+  8: 'treePath',
+  9: 'html', // history - treat as html
+  10: 'double',
+  11: 'string', // guid - treat as string
+  12: 'boolean',
+  13: 'identity',
+  14: 'picklistInteger',
+  15: 'picklistString',
+  16: 'picklistDouble',
 };
 
 /**
@@ -67,13 +73,27 @@ interface AdoProcessWorkItemTypeField {
 }
 
 /**
- * Expand level enum for getWorkItemTypeField API.
- * Mirrors ProcessWorkItemTypeFieldsExpandLevel from ADO API.
+ * Response type from WorkItemTrackingRestClient.getField()
  */
-enum FieldExpandLevel {
-  None = 0,
-  AllowedValues = 1,
-  All = 2,
+interface WitFieldInfo {
+  name?: string;
+  referenceName?: string;
+  type?: string | number;
+  isPicklist?: boolean;
+  isPicklistSuggested?: boolean;
+  picklistId?: string;
+  description?: string;
+}
+
+/**
+ * Response type from ProcessRestClient.getList()
+ */
+interface PicklistResponse {
+  id?: string;
+  name?: string;
+  type?: string;
+  items?: string[];
+  isSuggested?: boolean;
 }
 
 /**
@@ -84,10 +104,13 @@ async function getAdoClients() {
     await import('azure-devops-extension-api/Common/Client');
   const { WorkItemTrackingProcessRestClient } =
     await import('azure-devops-extension-api/WorkItemTrackingProcess');
+  const { WorkItemTrackingRestClient } =
+    await import('azure-devops-extension-api/WorkItemTracking');
 
   return {
     getClient,
     WorkItemTrackingProcessRestClient,
+    WorkItemTrackingRestClient,
   };
 }
 
@@ -120,6 +143,8 @@ export class FieldMappingService {
   private projectId: string | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private processClient: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private witClient: any = null;
 
   /** Cached mapping configuration */
   private cachedMapping: FieldMappingConfig | null = null;
@@ -144,10 +169,14 @@ export class FieldMappingService {
     const webContext = SDK.getWebContext();
     this.projectId = webContext.project?.id || null;
 
-    const { getClient, WorkItemTrackingProcessRestClient } =
-      await getAdoClients();
+    const {
+      getClient,
+      WorkItemTrackingProcessRestClient,
+      WorkItemTrackingRestClient,
+    } = await getAdoClients();
 
     this.processClient = getClient(WorkItemTrackingProcessRestClient);
+    this.witClient = getClient(WorkItemTrackingRestClient);
   }
 
   /**
@@ -314,9 +343,11 @@ export class FieldMappingService {
    * Get available fields from the Discussion Work Item Type.
    * These are the fields that can be mapped to semantic purposes.
    *
-   * Note: The getAllWorkItemTypeFields API does NOT return allowedValues for picklist fields.
-   * We must make additional calls to getWorkItemTypeField with expand=AllowedValues for each
-   * picklist field to get their allowed values.
+   * Note: The Process API (getAllWorkItemTypeFields) does NOT reliably identify picklist fields
+   * or return their allowedValues. We use a two-step approach:
+   * 1. Get field list from Process API (getAllWorkItemTypeFields)
+   * 2. For each Custom field, use WIT API (getField) to check if it's a picklist and get picklistId
+   * 3. For picklist fields, use Process API (getList) to get the actual allowed values
    */
   async getAvailableFields(
     processId: string,
@@ -326,125 +357,113 @@ export class FieldMappingService {
       return mockAvailableFields;
     }
 
-    if (!this.processClient) {
+    if (!this.processClient || !this.witClient) {
       throw new Error('Service not initialized');
     }
 
     try {
-      // Step 1: Get all fields (without allowedValues for picklists)
+      // Step 1: Get all fields from Process API
       const fields: AdoProcessWorkItemTypeField[] =
         await this.processClient.getAllWorkItemTypeFields(
           processId,
           witRefName
         );
 
-      // DIAGNOSTIC: Log raw API response for Custom fields
-      const rawCustomFields = fields.filter((f) =>
+      // Filter to Custom fields only
+      const customFields = fields.filter((f) =>
         f.referenceName?.startsWith('Custom.')
       );
+
       console.log(
-        '[FieldMappingService] DIAGNOSTIC - Raw fields from getAllWorkItemTypeFields:',
-        rawCustomFields.map((f) => ({
-          name: f.name,
-          referenceName: f.referenceName,
-          type: f.type,
-          typeOfType: typeof f.type,
-          isPicklist: f.isPicklist,
-          allowedValues: f.allowedValues,
-          allowedValuesLength: f.allowedValues?.length,
-        }))
+        `[FieldMappingService] Found ${customFields.length} custom fields. Checking for picklists...`
       );
 
-      // Step 2: Map to DiscoveredField and identify picklist fields
-      const customFields = fields
-        .filter((f) => f.referenceName?.startsWith('Custom.'))
-        .map((f) => {
-          const fieldType = this.mapAdoFieldType(f.type);
-          return {
-            name: f.name || '',
-            referenceName: f.referenceName || '',
-            type: fieldType,
-            isPicklist:
-              f.isPicklist ||
-              fieldType === 'picklistString' ||
-              fieldType === 'picklistInteger' ||
-              fieldType === 'picklistDouble',
-            allowedValues: f.allowedValues,
-            description: f.description,
-          };
-        });
+      // Step 2: Map fields and use WIT API to detect picklists
+      const discoveredFields: DiscoveredField[] = [];
 
-      // DIAGNOSTIC: Log mapped fields with their types
-      console.log(
-        '[FieldMappingService] DIAGNOSTIC - Mapped custom fields:',
-        customFields.map((f) => ({
-          name: f.name,
-          mappedType: f.type,
-          isPicklist: f.isPicklist,
-          hasAllowedValues: (f.allowedValues?.length ?? 0) > 0,
-        }))
-      );
+      for (const f of customFields) {
+        const fieldType = this.mapAdoFieldType(f.type);
+        let isPicklist = false;
+        let allowedValues: string[] | undefined = f.allowedValues;
 
-      // Step 3: For picklist fields, fetch allowedValues using individual field API with expand
-      const picklistFields = customFields.filter(
-        (f) =>
-          f.isPicklist && (!f.allowedValues || f.allowedValues.length === 0)
-      );
+        // Use WIT API to check if field is a picklist and get picklistId
+        try {
+          const witFieldInfo: WitFieldInfo = await this.witClient.getField(
+            f.referenceName
+          );
 
-      if (picklistFields.length > 0) {
-        console.log(
-          `[FieldMappingService] Fetching allowedValues for ${picklistFields.length} picklist field(s):`,
-          picklistFields.map((f) => f.name)
-        );
+          console.log(
+            `[FieldMappingService] WIT API response for ${f.name}:`,
+            JSON.stringify(
+              {
+                isPicklist: witFieldInfo.isPicklist,
+                picklistId: witFieldInfo.picklistId,
+              },
+              null,
+              2
+            )
+          );
 
-        // Fetch allowedValues for each picklist field in parallel
-        const picklistPromises = picklistFields.map(async (field) => {
-          try {
-            console.log(
-              `[FieldMappingService] DIAGNOSTIC - Calling getWorkItemTypeField for ${field.referenceName} with expand=${FieldExpandLevel.AllowedValues}`
-            );
+          isPicklist = witFieldInfo.isPicklist === true;
 
-            const detailedField: AdoProcessWorkItemTypeField =
-              await this.processClient.getWorkItemTypeField(
-                processId,
-                witRefName,
-                field.referenceName,
-                FieldExpandLevel.AllowedValues // Expand to include allowedValues
+          // If it's a picklist and we have a picklistId, fetch the actual values
+          if (isPicklist && witFieldInfo.picklistId) {
+            try {
+              const picklist: PicklistResponse =
+                await this.processClient.getList(witFieldInfo.picklistId);
+
+              console.log(
+                `[FieldMappingService] Picklist response for ${f.name}:`,
+                JSON.stringify(picklist, null, 2)
               );
 
-            // DIAGNOSTIC: Log the FULL response
-            console.log(
-              `[FieldMappingService] DIAGNOSTIC - Full response for ${field.name}:`,
-              JSON.stringify(detailedField, null, 2)
-            );
-
-            if (
-              detailedField.allowedValues &&
-              detailedField.allowedValues.length > 0
-            ) {
-              field.allowedValues = detailedField.allowedValues;
-              console.log(
-                `[FieldMappingService] Got allowedValues for ${field.name}:`,
-                detailedField.allowedValues
-              );
-            } else {
-              console.log(
-                `[FieldMappingService] DIAGNOSTIC - No allowedValues in response for ${field.name}. allowedValues =`,
-                detailedField.allowedValues
+              if (picklist.items && picklist.items.length > 0) {
+                allowedValues = picklist.items;
+                console.log(
+                  `[FieldMappingService] Got ${allowedValues.length} allowed values for ${f.name}:`,
+                  allowedValues
+                );
+              }
+            } catch (picklistErr) {
+              console.warn(
+                `[FieldMappingService] Failed to get picklist for ${f.name}:`,
+                picklistErr
               );
             }
-          } catch (err) {
-            console.warn(
-              `[FieldMappingService] Failed to get allowedValues for ${field.name}:`,
-              err
-            );
           }
-        });
+        } catch (witErr) {
+          console.warn(
+            `[FieldMappingService] Failed to get WIT field info for ${f.name}:`,
+            witErr
+          );
+          // Fall back to type-based detection
+          isPicklist =
+            fieldType === 'picklistString' ||
+            fieldType === 'picklistInteger' ||
+            fieldType === 'picklistDouble';
+        }
 
-        await Promise.all(picklistPromises);
+        discoveredFields.push({
+          name: f.name || '',
+          referenceName: f.referenceName || '',
+          type: isPicklist ? 'picklistString' : fieldType, // Override type if we know it's a picklist
+          isPicklist,
+          allowedValues,
+          description: f.description,
+        });
       }
 
-      return customFields;
+      console.log(
+        '[FieldMappingService] Final discovered fields:',
+        discoveredFields.map((f) => ({
+          name: f.name,
+          type: f.type,
+          isPicklist: f.isPicklist,
+          allowedValuesCount: f.allowedValues?.length ?? 0,
+        }))
+      );
+
+      return discoveredFields;
     } catch (error) {
       console.error(
         '[FieldMappingService] Error getting available fields:',
