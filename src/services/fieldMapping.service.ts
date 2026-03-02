@@ -338,6 +338,23 @@ export class FieldMappingService {
           witRefName
         );
 
+      // DIAGNOSTIC: Log raw API response for Custom fields
+      const rawCustomFields = fields.filter((f) =>
+        f.referenceName?.startsWith('Custom.')
+      );
+      console.log(
+        '[FieldMappingService] DIAGNOSTIC - Raw fields from getAllWorkItemTypeFields:',
+        rawCustomFields.map((f) => ({
+          name: f.name,
+          referenceName: f.referenceName,
+          type: f.type,
+          typeOfType: typeof f.type,
+          isPicklist: f.isPicklist,
+          allowedValues: f.allowedValues,
+          allowedValuesLength: f.allowedValues?.length,
+        }))
+      );
+
       // Step 2: Map to DiscoveredField and identify picklist fields
       const customFields = fields
         .filter((f) => f.referenceName?.startsWith('Custom.'))
@@ -357,6 +374,17 @@ export class FieldMappingService {
           };
         });
 
+      // DIAGNOSTIC: Log mapped fields with their types
+      console.log(
+        '[FieldMappingService] DIAGNOSTIC - Mapped custom fields:',
+        customFields.map((f) => ({
+          name: f.name,
+          mappedType: f.type,
+          isPicklist: f.isPicklist,
+          hasAllowedValues: (f.allowedValues?.length ?? 0) > 0,
+        }))
+      );
+
       // Step 3: For picklist fields, fetch allowedValues using individual field API with expand
       const picklistFields = customFields.filter(
         (f) =>
@@ -365,12 +393,17 @@ export class FieldMappingService {
 
       if (picklistFields.length > 0) {
         console.log(
-          `[FieldMappingService] Fetching allowedValues for ${picklistFields.length} picklist field(s)...`
+          `[FieldMappingService] Fetching allowedValues for ${picklistFields.length} picklist field(s):`,
+          picklistFields.map((f) => f.name)
         );
 
         // Fetch allowedValues for each picklist field in parallel
         const picklistPromises = picklistFields.map(async (field) => {
           try {
+            console.log(
+              `[FieldMappingService] DIAGNOSTIC - Calling getWorkItemTypeField for ${field.referenceName} with expand=${FieldExpandLevel.AllowedValues}`
+            );
+
             const detailedField: AdoProcessWorkItemTypeField =
               await this.processClient.getWorkItemTypeField(
                 processId,
@@ -379,6 +412,12 @@ export class FieldMappingService {
                 FieldExpandLevel.AllowedValues // Expand to include allowedValues
               );
 
+            // DIAGNOSTIC: Log the FULL response
+            console.log(
+              `[FieldMappingService] DIAGNOSTIC - Full response for ${field.name}:`,
+              JSON.stringify(detailedField, null, 2)
+            );
+
             if (
               detailedField.allowedValues &&
               detailedField.allowedValues.length > 0
@@ -386,6 +425,11 @@ export class FieldMappingService {
               field.allowedValues = detailedField.allowedValues;
               console.log(
                 `[FieldMappingService] Got allowedValues for ${field.name}:`,
+                detailedField.allowedValues
+              );
+            } else {
+              console.log(
+                `[FieldMappingService] DIAGNOSTIC - No allowedValues in response for ${field.name}. allowedValues =`,
                 detailedField.allowedValues
               );
             }
