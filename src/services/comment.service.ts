@@ -87,7 +87,7 @@ class WorkItemCommentsRestClient extends RestClientBase {
       apiVersion: WorkItemCommentsRestClient.API_VERSION,
       routeTemplate: '{project}/_apis/wit/workItems/{workItemId}/comments',
       routeValues: { project, workItemId },
-      queryParams: { $top: top, continuationToken },
+      queryParams: { $top: top, continuationToken, $expand: 'reactions' },
     });
   }
 
@@ -104,6 +104,7 @@ class WorkItemCommentsRestClient extends RestClientBase {
       routeTemplate:
         '{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}',
       routeValues: { project, workItemId, commentId },
+      queryParams: { $expand: 'reactions' },
     });
   }
 
