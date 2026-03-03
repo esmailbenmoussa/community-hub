@@ -23,16 +23,9 @@ export function SetupPage() {
     navigate('/');
   };
 
-  const handleSkip = () => {
-    trackEvent('setup_skipped');
-    // For now, just go to the main page
-    // In production, you might want to store that user skipped setup
-    navigate('/');
-  };
-
   return (
     <div className="min-h-screen bg-surface">
-      <SetupWizard onComplete={handleComplete} onSkip={handleSkip} />
+      <SetupWizard onComplete={handleComplete} />
     </div>
   );
 }

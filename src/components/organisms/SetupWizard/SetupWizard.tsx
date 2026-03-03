@@ -20,8 +20,6 @@ import { FieldMappingWizard } from '@/components/organisms/FieldMappingWizard';
 interface SetupWizardProps {
   /** Callback when setup is complete */
   onComplete?: () => void;
-  /** Callback when user wants to skip (if allowed) */
-  onSkip?: () => void;
 }
 
 /**
@@ -127,7 +125,9 @@ function ValidationCheckRow({
   hostName?: string;
 }) {
   const showProcessSettingsLink =
-    (check.id === 'process-template' || check.id === 'work-item-type') &&
+    (check.id === 'process-template' ||
+      check.id === 'work-item-type' ||
+      check.id === 'field-mapping') &&
     check.status === ValidationCheckStatus.Failed &&
     hostName;
 
@@ -250,7 +250,7 @@ function SetupInstructions() {
 /**
  * SetupWizard main component
  */
-export function SetupWizard({ onComplete, onSkip }: SetupWizardProps) {
+export function SetupWizard({ onComplete }: SetupWizardProps) {
   const { status, validationResult, isValidating, error, validate } =
     useSetup();
   const { hostName } = useAzureDevOps();
@@ -646,23 +646,15 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps) {
             Get Started
           </button>
         )}
-
-        {onSkip && status !== SetupStatus.Complete && (
-          <button
-            onClick={onSkip}
-            className="rounded-ado border border-border bg-surface px-4 py-2 font-medium text-content-secondary transition-colors hover:bg-surface-hover"
-          >
-            Skip for now
-          </button>
-        )}
       </div>
 
-      {/* Process info */}
-      {validationResult?.processName && (
-        <div className="mt-6 text-center text-sm text-content-disabled">
-          Process: {validationResult.processName}
-        </div>
-      )}
+      {/* Process and version info */}
+      <div className="mt-6 text-center text-sm text-content-disabled">
+        {validationResult?.processName && (
+          <div>Process: {validationResult.processName}</div>
+        )}
+        <div>Version: {__APP_VERSION__}</div>
+      </div>
     </div>
   );
 }
