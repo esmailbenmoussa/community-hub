@@ -27,7 +27,7 @@ export function ProjectBadge({ projectName, size = 'md' }: ProjectBadgeProps) {
       `}
       title={`This discussion is from the "${projectName}" project`}
     >
-      {/* Folder icon */}
+      {/* Globe icon */}
       <svg
         className={iconSize}
         fill="none"
@@ -38,7 +38,7 @@ export function ProjectBadge({ projectName, size = 'md' }: ProjectBadgeProps) {
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth={2}
-          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+          d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
         />
       </svg>
       <span>from {projectName}</span>
