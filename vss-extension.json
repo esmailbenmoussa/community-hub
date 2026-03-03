@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "community-hub",
   "publisher": "Repryl",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "name": "Community Hub",
   "description": "Community Hub is the home for team conversations in Azure DevOps. Ask questions, share announcements, upvote ideas, and comment—right next to your work. Enable productive collaboration.",
   "public": false,
@@ -47,10 +47,7 @@
         "name": "Community",
         "order": 50,
         "uri": "dist/index.html",
-        "icon": {
-          "light": "public/icons/light-icon.png",
-          "dark": "public/icons/dark-icon.png"
-        }
+        "icon": "public/icons/ch-icon.png"
       }
     },
     {
@@ -59,10 +56,7 @@
       "targets": [".community-hub-group"],
       "properties": {
         "name": "Discussions",
-        "icon": {
-          "light": "public/icons/light-icon.png",
-          "dark": "public/icons/dark-icon.png"
-        },
+        "icon": "public/icons/ch-icon.png",
         "order": 1,
         "uri": "dist/index.html"
       }
@@ -73,10 +67,7 @@
       "targets": ["ms.vss-web.collection-admin-hub-group"],
       "properties": {
         "name": "Community Hub",
-        "icon": {
-          "light": "public/icons/light-icon.png",
-          "dark": "public/icons/dark-icon.png"
-        },
+        "icon": "public/icons/ch-icon.png",
         "order": 100,
         "uri": "dist/index.html?view=org"
       }
