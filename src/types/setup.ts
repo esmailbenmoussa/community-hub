@@ -147,7 +147,8 @@ export const REQUIRED_DISCUSSION_FIELDS: RequiredFieldDefinition[] = [
     isRequired: true,
     // Note: allowedValues are dynamic and loaded from ADO picklist field configuration
     // Default values suggested for new setups: 'Announcements', 'General', 'Ideas', 'Help'
-    description: 'Discussion category (loaded dynamically from ADO picklist)',
+    description:
+      'Picklist (String). Example values: Announcements, General, Ideas, Help',
   },
   {
     referenceName: 'Custom.Visibility',
@@ -155,28 +156,29 @@ export const REQUIRED_DISCUSSION_FIELDS: RequiredFieldDefinition[] = [
     expectedType: ['string', 'picklistString'],
     isRequired: true,
     allowedValues: ['Project', 'Organization', 'CrossProject'],
-    description: 'Visibility scope for the discussion',
+    description:
+      'Picklist (String). Required values: Project, Organization, CrossProject',
   },
   {
     referenceName: 'Custom.TargetProjects',
     displayName: 'Target Projects',
     expectedType: ['string', 'html', 'plainText'],
     isRequired: false,
-    description: 'JSON array of project IDs for cross-project visibility',
+    description: 'Text (String). No values needed - managed by system',
   },
   {
     referenceName: 'Custom.VoteCount',
     displayName: 'Vote Count',
     expectedType: 'integer',
     isRequired: false,
-    description: 'Cached count of upvotes',
+    description: 'Integer. No values needed - managed by system',
   },
   {
     referenceName: 'Custom.IsPinned',
     displayName: 'Is Pinned',
     expectedType: 'boolean',
     isRequired: false,
-    description: 'Whether the discussion is pinned to the top',
+    description: 'Boolean. No values needed - managed by system',
   },
 ];
 

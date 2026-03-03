@@ -161,7 +161,7 @@ function ValidationCheckRow({
             href={`https://dev.azure.com/${hostName}/_settings/process`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-accent-primary mt-2 inline-flex items-center gap-1 text-sm hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-sm text-accent hover:underline"
           >
             Open Process Settings
             <svg
@@ -227,7 +227,7 @@ function SetupInstructions() {
             {REQUIRED_DISCUSSION_FIELDS.map((field) => (
               <li key={field.referenceName} className="flex items-center gap-2">
                 <code className="rounded bg-surface-tertiary px-1 text-xs">
-                  {field.referenceName}
+                  {field.referenceName.replace('Custom.', '')}
                 </code>
                 <span className="text-content-disabled">-</span>
                 <span>{field.description}</span>
