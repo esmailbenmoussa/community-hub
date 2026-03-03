@@ -14,6 +14,7 @@ import {
 } from '@/types';
 import { useSetup } from '@/hooks/useSetup';
 import { useFieldMapping } from '@/hooks/useFieldMapping';
+import { useAzureDevOps } from '@/hooks/useAzureDevOps';
 import { FieldMappingWizard } from '@/components/organisms/FieldMappingWizard';
 
 interface SetupWizardProps {
@@ -118,7 +119,18 @@ function StatusIcon({ status }: { status: ValidationCheckStatus }) {
 /**
  * Validation check row component
  */
-function ValidationCheckRow({ check }: { check: ValidationCheck }) {
+function ValidationCheckRow({
+  check,
+  hostName,
+}: {
+  check: ValidationCheck;
+  hostName?: string;
+}) {
+  const showProcessSettingsLink =
+    check.id === 'process-template' &&
+    check.status === ValidationCheckStatus.Failed &&
+    hostName;
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -143,6 +155,29 @@ function ValidationCheckRow({ check }: { check: ValidationCheck }) {
           >
             {check.message}
           </div>
+        )}
+        {showProcessSettingsLink && (
+          <a
+            href={`https://dev.azure.com/${hostName}/_settings/process`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent-primary mt-2 inline-flex items-center gap-1 text-sm hover:underline"
+          >
+            Open Process Settings
+            <svg
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
         )}
         {check.details && (
           <div className="mt-1 rounded bg-surface-secondary p-2 text-sm text-content-secondary">
@@ -218,6 +253,7 @@ function SetupInstructions() {
 export function SetupWizard({ onComplete, onSkip }: SetupWizardProps) {
   const { status, validationResult, isValidating, error, validate } =
     useSetup();
+  const { hostName } = useAzureDevOps();
 
   // Track if we're showing the field mapping wizard
   const [showFieldMapping, setShowFieldMapping] = useState(false);
@@ -567,7 +603,11 @@ export function SetupWizard({ onComplete, onSkip }: SetupWizardProps) {
           <h2 className="mb-4 font-semibold text-content">Validation Checks</h2>
           <div className="space-y-1">
             {validationResult.checks.map((check) => (
-              <ValidationCheckRow key={check.id} check={check} />
+              <ValidationCheckRow
+                key={check.id}
+                check={check}
+                hostName={hostName}
+              />
             ))}
           </div>
         </div>
