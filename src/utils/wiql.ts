@@ -407,8 +407,13 @@ export function buildOrgLevelQueryWithFields(
   sort?: SortOption,
   fields?: ResolvedFields
 ): string {
-  const select = fields
-    ? buildSelectClauseWithFields(fields)
+  // Exclude TargetProjects from org-wide queries to avoid TF51005 errors
+  // when the field doesn't exist in all projects
+  const fieldsForSelect = fields
+    ? { ...fields, TargetProjects: undefined }
+    : undefined;
+  const select = fieldsForSelect
+    ? buildSelectClauseWithFields(fieldsForSelect)
     : buildSelectClause();
   const from = buildFromClause();
 
