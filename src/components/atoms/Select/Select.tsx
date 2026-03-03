@@ -134,7 +134,7 @@ export const Select = ({
   };
 
   return (
-    <div ref={containerRef} className={`relative w-full ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       {/* Label */}
       {label && (
         <label className="mb-1.5 block text-sm font-medium text-content">
