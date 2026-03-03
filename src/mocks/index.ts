@@ -96,6 +96,16 @@ export const mockDiscussionFields = [
 import type { DiscoveredField } from '@/types/fieldMapping';
 import type { FieldType } from '@/types/setup';
 
+/**
+ * Mock projects for org-wide view
+ */
+export const mockProjects: Array<{ id: string; name: string }> = [
+  { id: 'proj-alpha-001', name: 'Project Alpha' },
+  { id: 'proj-beta-002', name: 'Project Beta' },
+  { id: 'proj-gamma-003', name: 'Project Gamma' },
+  { id: 'mock-project-id-12345', name: 'mock-project' },
+];
+
 export const mockAvailableFields: DiscoveredField[] = [
   // Exact-match fields (will auto-match)
   {

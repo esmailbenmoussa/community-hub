@@ -21,6 +21,7 @@ import {
 import { isDevMode } from '@/utils/environment';
 import {
   buildListDiscussionsQueryWithFields,
+  buildOrgLevelQueryWithFields,
   parseCategory,
   parseVisibility,
   parseJsonArray,
@@ -74,6 +75,17 @@ async function getWorkItemTrackingClient() {
     await import('azure-devops-extension-api/WorkItemTracking');
 
   return getClient(WorkItemTrackingRestClient);
+}
+
+/**
+ * Dynamically load Core API client (only in production)
+ */
+async function getCoreClient() {
+  const { getClient } =
+    await import('azure-devops-extension-api/Common/Client');
+  const { CoreRestClient } = await import('azure-devops-extension-api/Core');
+
+  return getClient(CoreRestClient);
 }
 
 /**
@@ -561,6 +573,151 @@ export class DiscussionService {
    */
   async pin(id: number, pinned: boolean): Promise<Discussion> {
     return this.update(id, { isPinned: pinned });
+  }
+
+  /**
+   * List discussions across all projects (for org admin view).
+   * Uses org-level WIQL query to fetch discussions with org-wide or cross-project visibility.
+   */
+  async listOrgWide(
+    options: {
+      projectId?: string;
+      page?: number;
+      pageSize?: number;
+    } = {}
+  ): Promise<PaginatedResult<Discussion>> {
+    this.ensureInitialized();
+
+    const page = options.page || 1;
+    const pageSize = options.pageSize || DEFAULT_PAGE_SIZE;
+
+    if (isDevMode()) {
+      return this.getMockOrgWideDiscussions(options.projectId, page, pageSize);
+    }
+
+    const fields = this.getFields();
+
+    try {
+      // Build org-level WIQL query
+      const wiql = buildOrgLevelQueryWithFields(
+        options.projectId ? { projectId: options.projectId } : undefined,
+        undefined, // sort - let it use default (pinned first, then newest)
+        fields
+      );
+
+      console.log('[DiscussionService] Executing org-wide WIQL query:', wiql);
+
+      // Execute WIQL query - note: for org-wide, we don't specify a project
+      const queryResult: WorkItemQueryResult =
+        await this.workItemClient.queryByWiql({ query: wiql });
+
+      const workItemIds = queryResult.workItems?.map((wi) => wi.id) || [];
+      const totalCount = workItemIds.length;
+
+      // Apply pagination
+      const startIndex = (page - 1) * pageSize;
+      const paginatedIds = workItemIds.slice(startIndex, startIndex + pageSize);
+
+      if (paginatedIds.length === 0) {
+        return {
+          items: [],
+          totalCount,
+          page,
+          pageSize,
+          hasMore: false,
+        };
+      }
+
+      // Fetch full work items
+      const workItems = await this.workItemClient.getWorkItems(
+        paginatedIds,
+        undefined,
+        undefined,
+        undefined,
+        4 // WorkItemExpand.All
+      );
+
+      const discussions = workItems.map((wi: WorkItem) =>
+        this.mapWorkItemToDiscussion(wi)
+      );
+
+      return {
+        items: discussions,
+        totalCount,
+        page,
+        pageSize,
+        hasMore: startIndex + pageSize < totalCount,
+      };
+    } catch (error) {
+      console.error(
+        '[DiscussionService] Error listing org-wide discussions:',
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get all projects the user has access to.
+   * Used for the project filter in org admin view.
+   */
+  async getProjects(): Promise<Array<{ id: string; name: string }>> {
+    if (isDevMode()) {
+      // Return mock projects
+      const { mockProjects } = await import('@/mocks');
+      return mockProjects;
+    }
+
+    try {
+      const coreClient = await getCoreClient();
+      const projects = await coreClient.getProjects();
+
+      return projects.map((p) => ({
+        id: p.id || '',
+        name: p.name || '',
+      }));
+    } catch (error) {
+      console.error('[DiscussionService] Error fetching projects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get mock org-wide discussions for dev mode
+   */
+  private getMockOrgWideDiscussions(
+    projectId: string | undefined,
+    page: number,
+    pageSize: number
+  ): PaginatedResult<Discussion> {
+    let filtered = [...mockDiscussions];
+
+    // Filter by project if specified
+    if (projectId) {
+      filtered = filtered.filter(
+        (d) => d.projectId === projectId || d.projectName === projectId
+      );
+    }
+
+    // Sort: pinned first, then by created date
+    filtered.sort((a, b) => {
+      if (a.isPinned !== b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+      return b.createdDate.getTime() - a.createdDate.getTime();
+    });
+
+    const totalCount = filtered.length;
+    const startIndex = (page - 1) * pageSize;
+    const items = filtered.slice(startIndex, startIndex + pageSize);
+
+    return {
+      items,
+      totalCount,
+      page,
+      pageSize,
+      hasMore: startIndex + pageSize < totalCount,
+    };
   }
 
   /**
