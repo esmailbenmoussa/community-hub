@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export interface SelectOption {
   value: string;
   label: string;
+  icon?: ReactNode;
 }
 
 export interface SelectProps {
@@ -155,8 +156,9 @@ export const Select = ({
         `}
       >
         <span
-          className={selectedOption ? 'text-content' : 'text-content-secondary'}
+          className={`flex items-center gap-2 ${selectedOption ? 'text-content' : 'text-content-secondary'}`}
         >
+          {selectedOption?.icon}
           {selectedLabel}
         </span>
 
@@ -206,7 +208,10 @@ export const Select = ({
                     hover:bg-surface-hover
                   `}
                 >
-                  <span>{option.label}</span>
+                  <span className="flex items-center gap-2">
+                    {option.icon}
+                    {option.label}
+                  </span>
 
                   {/* Checkmark for selected */}
                   {isSelected && (
