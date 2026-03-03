@@ -398,7 +398,7 @@ export function HubPage() {
                 <span>Community Hub v{version}</span>
                 <span>·</span>
                 <a
-                  href="#"
+                  href="https://marketplace.visualstudio.com/items?itemName=Repryl.community-hub&ssr=false#overview"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-colors hover:text-content hover:underline"
