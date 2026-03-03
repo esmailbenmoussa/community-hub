@@ -9,9 +9,8 @@ import { initializeServices } from '@/services';
 // Injected by Vite from vss-extension.json
 declare const __APP_VERSION__: string;
 
-// TODO: Replace with your Aptabase key or remove analytics
-// Get your key at https://aptabase.com
-const APTABASE_KEY = 'YOUR-APTABASE-KEY';
+// Aptabase analytics key (https://aptabase.com)
+const APTABASE_KEY = 'A-EU-6044748787';
 
 // Render the app
 const renderApp = () => {

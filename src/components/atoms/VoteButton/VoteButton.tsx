@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useAptabase } from '@aptabase/react';
 
 interface VoteButtonProps {
   /** Current vote count */
@@ -24,6 +25,13 @@ export function VoteButton({
   disabled = false,
   size = 'md',
 }: VoteButtonProps) {
+  const { trackEvent } = useAptabase();
+
+  const handleClick = () => {
+    trackEvent('vote_clicked', { action: hasVoted ? 'remove' : 'upvote' });
+    onVote();
+  };
+
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs gap-1',
     md: 'px-3 py-1.5 text-sm gap-1.5',
@@ -37,7 +45,7 @@ export function VoteButton({
   return (
     <motion.button
       type="button"
-      onClick={onVote}
+      onClick={handleClick}
       disabled={disabled}
       whileTap={{ scale: 0.95 }}
       className={`

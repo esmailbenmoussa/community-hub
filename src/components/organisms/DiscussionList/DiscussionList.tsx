@@ -1,4 +1,6 @@
+import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAptabase } from '@aptabase/react';
 import { Discussion } from '@/types';
 import { DiscussionRow } from '@/components/molecules/DiscussionRow';
 import { Pagination } from '@/components/atoms/Pagination';
@@ -89,6 +91,17 @@ export function DiscussionList({
   emptyMessage = 'No discussions yet. Start a new one!',
 }: DiscussionListProps) {
   const { projectName: currentProjectName } = useAzureDevOps();
+  const { trackEvent } = useAptabase();
+
+  // Track discussion click with category
+  const handleDiscussionClick = useCallback(
+    (discussion: Discussion) => {
+      trackEvent('discussion_clicked', { category: discussion.category });
+      onDiscussionClick(discussion.id);
+    },
+    [trackEvent, onDiscussionClick]
+  );
+
   // Show loading skeletons
   if (isLoading && discussions.length === 0) {
     return (
@@ -120,7 +133,7 @@ export function DiscussionList({
               discussion={discussion}
               hasVoted={votedIds.has(discussion.id)}
               onVote={onVote}
-              onClick={onDiscussionClick}
+              onClick={() => handleDiscussionClick(discussion)}
               voteDisabled={voteDisabled}
               currentProjectName={currentProjectName}
             />

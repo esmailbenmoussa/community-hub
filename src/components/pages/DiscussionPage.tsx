@@ -3,7 +3,9 @@
  * Page for viewing a single discussion with comments
  */
 
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAptabase } from '@aptabase/react';
 import { useDiscussion } from '@/hooks/useDiscussion';
 import { useComments } from '@/hooks/useComments';
 import { useAzureDevOps } from '@/hooks/useAzureDevOps';
@@ -13,6 +15,7 @@ import { CommentReactionType, UpdateDiscussionInput } from '@/types';
 export function DiscussionPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { trackEvent } = useAptabase();
   const { user, projectName } = useAzureDevOps();
 
   const discussionId = id ? parseInt(id, 10) : 0;
@@ -43,6 +46,26 @@ export function DiscussionPage() {
     discussionId,
     autoFetch: discussionId > 0,
   });
+
+  // Track page view when discussion loads
+  useEffect(() => {
+    if (discussion && !discussionLoading) {
+      trackEvent('page_viewed', {
+        page: 'discussion',
+        category: discussion.category,
+      });
+    }
+  }, [discussion, discussionLoading, trackEvent]);
+
+  // Track errors
+  useEffect(() => {
+    if (discussionError) {
+      trackEvent('error_occurred', { type: 'discussion_load' });
+    }
+    if (commentsError) {
+      trackEvent('error_occurred', { type: 'comments_load' });
+    }
+  }, [discussionError, commentsError, trackEvent]);
 
   const handleBack = () => {
     navigate('/');

@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useAptabase } from '@aptabase/react';
 import { CategoryValue, VisibilityScope, CreateDiscussionInput } from '@/types';
 import { Select, SelectOption } from '@/components/atoms/Select';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
@@ -34,6 +35,8 @@ export function NewDiscussionForm({
   isSubmitting = false,
   defaultCategory,
 }: NewDiscussionFormProps) {
+  const { trackEvent } = useAptabase();
+
   // Get dynamic categories from hook
   const {
     categories,
@@ -147,6 +150,7 @@ export function NewDiscussionForm({
       tags: tags.length > 0 ? tags : undefined,
     };
 
+    trackEvent('discussion_created', { category, visibility });
     await onSubmit(input);
   };
 

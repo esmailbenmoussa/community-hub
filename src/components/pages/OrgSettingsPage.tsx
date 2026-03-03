@@ -4,7 +4,8 @@
  * Accessed via ?view=org query parameter
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useAptabase } from '@aptabase/react';
 import { useOrgDiscussions } from '@/hooks/useOrgDiscussions';
 import { useToast } from '@/hooks/useToast';
 import { useAzureDevOps } from '@/hooks/useAzureDevOps';
@@ -225,6 +226,7 @@ function EmptyState({ hasFilter }: { hasFilter: boolean }) {
  */
 export function OrgSettingsPage() {
   const { isReady, hostName } = useAzureDevOps();
+  const { trackEvent } = useAptabase();
   const { showSuccess, showError } = useToast();
 
   const {
@@ -241,6 +243,13 @@ export function OrgSettingsPage() {
     setProjectFilter,
     togglePin,
   } = useOrgDiscussions({ autoFetch: true });
+
+  // Track page view
+  useEffect(() => {
+    if (isReady) {
+      trackEvent('page_viewed', { page: 'org_settings' });
+    }
+  }, [isReady, trackEvent]);
 
   // Build project options for dropdown
   const projectOptions: SelectOption[] = [

@@ -4,6 +4,7 @@
  * Uses dynamic categories from ADO picklist.
  */
 
+import { useAptabase } from '@aptabase/react';
 import { CategoryValue } from '@/types';
 import { getCategorySetting } from '@/types/categorySettings';
 import { ICON_PRESETS, COLOR_PRESETS } from '@/config/categoryPresets';
@@ -25,15 +26,21 @@ export function NavigationPanel({
   selectedCategory,
   onCategoryClick,
 }: NavigationPanelProps) {
+  const { trackEvent } = useAptabase();
   // Get dynamic categories and settings from hook
   const { categories, categorySettings, isLoading } = useCategories();
+
+  const handleCategoryClick = (category?: CategoryValue) => {
+    trackEvent('category_filtered', { category: category || 'all' });
+    onCategoryClick(category);
+  };
 
   return (
     <div className="p-4">
       {/* Navigation links */}
       <nav className="space-y-px">
         <button
-          onClick={() => onCategoryClick(undefined)}
+          onClick={() => handleCategoryClick(undefined)}
           className={`flex w-full items-center gap-2 rounded-ado px-3 py-2 text-left text-sm ${
             !selectedCategory
               ? 'bg-accent-light text-accent'
@@ -75,7 +82,7 @@ export function NavigationPanel({
             return (
               <button
                 key={category}
-                onClick={() => onCategoryClick(category)}
+                onClick={() => handleCategoryClick(category)}
                 className={`flex w-full items-center gap-2 rounded-ado px-3 py-2 text-left text-sm ${
                   selectedCategory === category
                     ? 'bg-accent-light text-accent'

@@ -4,6 +4,7 @@
  */
 
 import { motion } from 'framer-motion';
+import { useAptabase } from '@aptabase/react';
 import { CommentReaction, CommentReactionType } from '@/types';
 import {
   ReactionPicker,
@@ -31,10 +32,26 @@ export function ReactionBar({
   disabled = false,
   className = '',
 }: ReactionBarProps) {
+  const { trackEvent } = useAptabase();
+
   // Filter out reactions with 0 count and sort by count (highest first)
   const sortedReactions = [...reactions]
     .filter((r) => r.count > 0)
     .sort((a, b) => b.count - a.count);
+
+  const handleReactionClick = (reaction: CommentReaction) => {
+    if (disabled) return;
+    trackEvent('reaction_clicked', {
+      reaction: reaction.type,
+      action: reaction.isCurrentUserEngaged ? 'remove' : 'add',
+    });
+    onToggleReaction(reaction.type);
+  };
+
+  const handleReactionSelect = (type: CommentReactionType) => {
+    trackEvent('reaction_clicked', { reaction: type, action: 'add' });
+    onToggleReaction(type);
+  };
 
   return (
     <div className={`flex flex-wrap items-center gap-1 ${className}`}>
@@ -42,7 +59,7 @@ export function ReactionBar({
       {sortedReactions.map((reaction) => (
         <motion.button
           key={reaction.type}
-          onClick={() => !disabled && onToggleReaction(reaction.type)}
+          onClick={() => handleReactionClick(reaction)}
           disabled={disabled}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -62,7 +79,7 @@ export function ReactionBar({
 
       {/* Add reaction button */}
       <ReactionPicker
-        onSelect={onToggleReaction}
+        onSelect={handleReactionSelect}
         disabled={disabled}
         className="ml-0.5"
       />

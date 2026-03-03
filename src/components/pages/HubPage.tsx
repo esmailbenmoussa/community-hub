@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSetAtom } from 'jotai';
+import { useAptabase } from '@aptabase/react';
 import {
   SetupStatus,
   SortOption,
@@ -32,6 +33,7 @@ import { version } from '../../../vss-extension.json';
 
 export function HubPage() {
   const navigate = useNavigate();
+  const { trackEvent } = useAptabase();
   const { isReady, projectName, hostName, user } = useAzureDevOps();
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
   const [setupComplete, setSetupComplete] = useState(false);
@@ -88,6 +90,7 @@ export function HubPage() {
         }
       } catch (err) {
         console.error('Error checking setup status:', err);
+        trackEvent('error_occurred', { type: 'setup_check' });
         // If we can't check, redirect to setup
         navigate('/setup');
       } finally {
@@ -98,7 +101,7 @@ export function HubPage() {
     if (isReady) {
       checkSetup();
     }
-  }, [isReady, navigate]);
+  }, [isReady, navigate, trackEvent]);
 
   // Load user preferences on mount
   useEffect(() => {
@@ -108,13 +111,14 @@ export function HubPage() {
         setPageSize(prefs.pageSize);
       } catch (err) {
         console.error('Error loading user preferences:', err);
+        trackEvent('error_occurred', { type: 'preferences_load' });
       }
     };
 
     if (isReady) {
       loadPreferences();
     }
-  }, [isReady]);
+  }, [isReady, trackEvent]);
 
   // Load category settings on mount
   useEffect(() => {
@@ -125,13 +129,21 @@ export function HubPage() {
         setCategorySettingsLoaded(true);
       } catch (err) {
         console.error('Error loading category settings:', err);
+        trackEvent('error_occurred', { type: 'category_settings_load' });
       }
     };
 
     if (isReady) {
       loadCategorySettings();
     }
-  }, [isReady, setCategorySettings, setCategorySettingsLoaded]);
+  }, [isReady, setCategorySettings, setCategorySettingsLoaded, trackEvent]);
+
+  // Track page view when setup is complete
+  useEffect(() => {
+    if (setupComplete) {
+      trackEvent('page_viewed', { page: 'hub' });
+    }
+  }, [setupComplete, trackEvent]);
 
   // Handle settings change (reload preferences and refresh)
   const handleSettingsChange = useCallback(async () => {
@@ -154,8 +166,9 @@ export function HubPage() {
 
   // Handle new discussion button
   const handleNewDiscussion = useCallback(() => {
+    trackEvent('new_discussion_clicked');
     setShowNewDiscussionModal(true);
-  }, []);
+  }, [trackEvent]);
 
   // Handle new discussion success
   const handleNewDiscussionSuccess = useCallback(
@@ -168,10 +181,31 @@ export function HubPage() {
   // Handle sort change
   const handleSortChange = useCallback(
     (e: { target: { value: string } }) => {
-      setSort(e.target.value as SortOption);
+      const newSort = e.target.value as SortOption;
+      trackEvent('sort_changed', { sortBy: newSort });
+      setSort(newSort);
     },
-    [setSort]
+    [setSort, trackEvent]
   );
+
+  // Handle search
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const query = e.target.value;
+      setSearchQuery(query);
+      // Track search when user types (debounced by nature of typing)
+      if (query.length > 2) {
+        trackEvent('search_performed');
+      }
+    },
+    [trackEvent]
+  );
+
+  // Handle settings modal open
+  const handleSettingsOpen = useCallback(() => {
+    trackEvent('settings_opened');
+    setShowSettingsModal(true);
+  }, [trackEvent]);
 
   // Filter discussions by search query (client-side for now)
   const filteredDiscussions = searchQuery
@@ -298,7 +332,7 @@ export function HubPage() {
                     type="text"
                     placeholder="Search discussions..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={handleSearchChange}
                     className="w-64 rounded-ado border border-border bg-surface px-3 py-2 pl-9 text-sm text-content placeholder:text-content-disabled focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <svg
@@ -316,7 +350,7 @@ export function HubPage() {
                   </svg>
                 </div>
                 <button
-                  onClick={() => setShowSettingsModal(true)}
+                  onClick={handleSettingsOpen}
                   className="rounded-ado p-2 text-content-secondary hover:bg-surface-hover"
                   title="Settings"
                 >

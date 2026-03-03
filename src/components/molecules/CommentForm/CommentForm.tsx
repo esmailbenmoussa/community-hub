@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { useAptabase } from '@aptabase/react';
 import { User } from '@/types';
 import { Avatar } from '@/components/atoms/Avatar';
 
@@ -27,6 +28,7 @@ export function CommentForm({
   disabled = false,
   placeholder = 'Add a comment...',
 }: CommentFormProps) {
+  const { trackEvent } = useAptabase();
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -38,6 +40,7 @@ export function CommentForm({
     setIsSubmitting(true);
     try {
       await onSubmit(text);
+      trackEvent('comment_submitted');
       setText('');
     } catch (err) {
       console.error('Failed to submit comment:', err);
