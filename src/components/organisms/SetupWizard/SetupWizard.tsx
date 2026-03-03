@@ -127,7 +127,7 @@ function ValidationCheckRow({
   hostName?: string;
 }) {
   const showProcessSettingsLink =
-    check.id === 'process-template' &&
+    (check.id === 'process-template' || check.id === 'work-item-type') &&
     check.status === ValidationCheckStatus.Failed &&
     hostName;
 
