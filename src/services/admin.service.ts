@@ -317,19 +317,28 @@ class AdminService {
     }
 
     try {
-      // Use the Graph API to search for users
+      // Use the Identity Picker API to search for users (server-side filtering)
       const accessToken = await SDK.getAccessToken();
       const host = SDK.getHost();
-      const orgUrl = `https://vssps.dev.azure.com/${host.name}`;
+      const orgUrl = `https://dev.azure.com/${host.name}`;
 
       const response = await fetch(
-        `${orgUrl}/_apis/graph/users?api-version=7.1-preview.1`,
+        `${orgUrl}/_apis/identitypicker/identities?api-version=7.1-preview.1`,
         {
-          method: 'GET',
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            query: query,
+            identityTypes: ['user'],
+            operationScopes: ['ims', 'source'],
+            options: {
+              MinResults: 5,
+              MaxResults: 10,
+            },
+          }),
         }
       );
 
@@ -344,27 +353,25 @@ class AdminService {
       const data = await response.json();
       const users: IdentitySearchResult[] = [];
 
-      const lowerQuery = query.toLowerCase();
+      // Identity Picker returns results in a different format
+      // Results are in data.results[0].identities array
+      const identities = data.results?.[0]?.identities || [];
 
-      // Filter and map the results
-      for (const user of data.value || []) {
-        const displayName = user.displayName || '';
-        const principalName = user.principalName || '';
-
-        if (
-          displayName.toLowerCase().includes(lowerQuery) ||
-          principalName.toLowerCase().includes(lowerQuery)
-        ) {
-          users.push({
-            id: user.originId || user.descriptor,
-            displayName: displayName,
-            uniqueName: principalName,
-            imageUrl: user._links?.avatar?.href,
-          });
+      for (const identity of identities) {
+        // Skip non-user identities (groups, etc.)
+        if (identity.entityType !== 'User') {
+          continue;
         }
+
+        users.push({
+          id: identity.localId || identity.originId || identity.entityId,
+          displayName: identity.displayName || '',
+          uniqueName: identity.signInAddress || identity.mail || '',
+          imageUrl: identity.image,
+        });
       }
 
-      return users.slice(0, 10); // Limit to 10 results
+      return users;
     } catch (error) {
       console.error('[AdminService] Error searching users:', error);
       return [];
