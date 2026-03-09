@@ -6,6 +6,10 @@
 
 import * as SDK from 'azure-devops-extension-sdk';
 import {
+  IVssIdentityService,
+  IIdentity,
+} from 'azure-devops-extension-api/Identities';
+import {
   Admin,
   AdminSettings,
   DEFAULT_ADMIN_SETTINGS,
@@ -13,6 +17,25 @@ import {
   EDS_COLLECTIONS,
 } from '@/types';
 import { isDevMode } from '@/utils/environment';
+
+/**
+ * Identity Service ID constant
+ * Using string literal since const enums can't be accessed with isolatedModules
+ */
+const IDENTITY_SERVICE_ID = 'ms.vss-features.identity-service';
+
+/**
+ * Extended IIdentity interface with runtime properties
+ * The TypeScript interface only declares 4 properties, but the actual
+ * runtime object returned by searchIdentitiesAsync contains many more.
+ */
+interface IIdentityExtended extends IIdentity {
+  displayName?: string;
+  signInAddress?: string;
+  mail?: string;
+  image?: string;
+  localId?: string;
+}
 
 /**
  * Extension Data Service interface (from ADO SDK)
@@ -317,61 +340,28 @@ class AdminService {
     }
 
     try {
-      // Use the Identity Picker API to search for users (server-side filtering)
-      const accessToken = await SDK.getAccessToken();
-      const host = SDK.getHost();
-      const orgUrl = `https://dev.azure.com/${host.name}`;
+      // Use the IVssIdentityService to search for users
+      // This handles CORS and authentication automatically through the SDK proxy
+      const identityService =
+        await SDK.getService<IVssIdentityService>(IDENTITY_SERVICE_ID);
 
-      const response = await fetch(
-        `${orgUrl}/_apis/identitypicker/identities?api-version=7.1-preview.1`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: query,
-            identityTypes: ['user'],
-            operationScopes: ['ims', 'source'],
-            options: {
-              MinResults: 5,
-              MaxResults: 10,
-            },
-          }),
-        }
+      const identities = await identityService.searchIdentitiesAsync(
+        query,
+        ['user'], // Only search users, not groups
+        ['ims', 'source'] // Search scopes
       );
 
-      if (!response.ok) {
-        console.error(
-          '[AdminService] Error searching users:',
-          response.statusText
-        );
-        return [];
-      }
-
-      const data = await response.json();
-      const users: IdentitySearchResult[] = [];
-
-      // Identity Picker returns results in a different format
-      // Results are in data.results[0].identities array
-      const identities = data.results?.[0]?.identities || [];
-
-      for (const identity of identities) {
-        // Skip non-user identities (groups, etc.)
-        if (identity.entityType !== 'User') {
-          continue;
-        }
-
-        users.push({
-          id: identity.localId || identity.originId || identity.entityId,
-          displayName: identity.displayName || '',
-          uniqueName: identity.signInAddress || identity.mail || '',
-          imageUrl: identity.image,
-        });
-      }
-
-      return users;
+      // Map IIdentity results to IdentitySearchResult
+      // Cast to IIdentityExtended to access runtime properties not in TypeScript types
+      return identities.map((identity) => {
+        const ext = identity as IIdentityExtended;
+        return {
+          id: ext.localId || ext.originId || ext.entityId,
+          displayName: ext.displayName || ext.signInAddress || '',
+          uniqueName: ext.signInAddress || ext.mail || '',
+          imageUrl: ext.image,
+        };
+      });
     } catch (error) {
       console.error('[AdminService] Error searching users:', error);
       return [];
