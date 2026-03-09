@@ -479,25 +479,43 @@ export function SettingsModal({
                               Categories
                             </h3>
                             <p className="mb-3 text-sm text-content-secondary">
-                              Customize icons and colors for each category
+                              Customize icons, colors, and visibility for each
+                              category. Hidden categories will not appear for
+                              end-users.
                             </p>
                             <div className="space-y-2">
-                              {categoriesToShow.map((category) => (
-                                <CategorySettingsRow
-                                  key={category}
-                                  category={category}
-                                  setting={getCategorySetting(
-                                    category,
-                                    localCategorySettings
-                                  )}
-                                  onChange={(setting) =>
-                                    handleCategorySettingChange(
-                                      category,
-                                      setting
-                                    )
-                                  }
-                                />
-                              ))}
+                              {categoriesToShow.map((category) => {
+                                const currentSetting = getCategorySetting(
+                                  category,
+                                  localCategorySettings
+                                );
+                                // Count how many categories are currently visible
+                                const visibleCount = categoriesToShow.filter(
+                                  (cat) =>
+                                    !getCategorySetting(
+                                      cat,
+                                      localCategorySettings
+                                    ).hidden
+                                ).length;
+                                // Disable hiding if this is the last visible category
+                                const isLastVisible =
+                                  visibleCount === 1 && !currentSetting.hidden;
+
+                                return (
+                                  <CategorySettingsRow
+                                    key={category}
+                                    category={category}
+                                    setting={currentSetting}
+                                    onChange={(setting) =>
+                                      handleCategorySettingChange(
+                                        category,
+                                        setting
+                                      )
+                                    }
+                                    disableHide={isLastVisible}
+                                  />
+                                );
+                              })}
                             </div>
                             <div className="mt-4 flex items-center justify-end gap-2">
                               {categorySettingsSaved && (

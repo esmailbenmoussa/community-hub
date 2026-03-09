@@ -37,9 +37,9 @@ export function NewDiscussionForm({
 }: NewDiscussionFormProps) {
   const { trackEvent } = useAptabase();
 
-  // Get dynamic categories from hook
+  // Get dynamic categories from hook - use visibleCategories for end-user selection
   const {
-    categories,
+    visibleCategories,
     defaultCategory: hookDefaultCategory,
     isLoading: categoriesLoading,
   } = useCategories();
@@ -57,13 +57,13 @@ export function NewDiscussionForm({
 
   // Update category when categories load (if not already set to a valid value)
   useEffect(() => {
-    if (!categoriesLoading && categories.length > 0) {
+    if (!categoriesLoading && visibleCategories.length > 0) {
       // If current category is not in the list, reset to default
-      if (!categories.includes(category)) {
-        setCategory(defaultCategory ?? categories[0]);
+      if (!visibleCategories.includes(category)) {
+        setCategory(defaultCategory ?? visibleCategories[0]);
       }
     }
-  }, [categories, categoriesLoading, category, defaultCategory]);
+  }, [visibleCategories, categoriesLoading, category, defaultCategory]);
 
   // Fetch available tags for autocomplete
   const { availableTags, isLoading: tagsLoading } = useTags();
@@ -183,7 +183,7 @@ export function NewDiscussionForm({
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
+            {visibleCategories.map((cat) => (
               <button
                 key={cat}
                 type="button"

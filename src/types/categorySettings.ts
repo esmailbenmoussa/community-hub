@@ -47,6 +47,8 @@ export type ColorName =
 export interface CategorySetting {
   icon: IconName;
   color: ColorName;
+  /** Whether the category is hidden from end-users (admin-only visibility) */
+  hidden?: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ export type CategorySettings = Record<CategoryValue, CategorySetting>;
 export const FALLBACK_CATEGORY_SETTING: CategorySetting = {
   icon: 'tag',
   color: 'gray',
+  hidden: false,
 };
 
 /**
@@ -69,10 +72,14 @@ export const FALLBACK_CATEGORY_SETTING: CategorySetting = {
  * These provide sensible defaults for the standard categories.
  */
 export const BUILTIN_CATEGORY_SETTINGS: Record<Category, CategorySetting> = {
-  [Category.Announcements]: { icon: 'megaphone', color: 'purple' },
-  [Category.General]: { icon: 'chat', color: 'gray' },
-  [Category.Ideas]: { icon: 'lightbulb', color: 'blue' },
-  [Category.Help]: { icon: 'question', color: 'green' },
+  [Category.Announcements]: {
+    icon: 'megaphone',
+    color: 'purple',
+    hidden: false,
+  },
+  [Category.General]: { icon: 'chat', color: 'gray', hidden: false },
+  [Category.Ideas]: { icon: 'lightbulb', color: 'blue', hidden: false },
+  [Category.Help]: { icon: 'question', color: 'green', hidden: false },
 };
 
 /**

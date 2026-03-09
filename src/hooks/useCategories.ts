@@ -26,13 +26,15 @@ import { validationService } from '@/services/validation.service';
  * Return type for the useCategories hook
  */
 export interface UseCategoriesResult {
-  /** List of available categories (from ADO picklist or defaults) */
+  /** List of all available categories (from ADO picklist or defaults) - for admin use */
   categories: CategoryValue[];
+  /** List of visible categories (excluding hidden ones) - for end-user UI */
+  visibleCategories: CategoryValue[];
   /** Whether categories are currently loading */
   isLoading: boolean;
   /** Error message if loading failed */
   error?: string;
-  /** The default category to use (first category or 'General') */
+  /** The default category to use (first visible category or 'General') */
   defaultCategory: CategoryValue;
   /** Whether categories have been loaded from field mapping */
   isFromPicklist: boolean;
@@ -153,9 +155,21 @@ export function useCategories(): UseCategoriesResult {
     await loadCategories();
   }, [loadCategories, setCategoriesLoaded, setAvailableCategories]);
 
-  // Determine the default category
+  // Get all categories (for admin use)
+  const allCategories =
+    availableCategories.length > 0
+      ? availableCategories
+      : [...DEFAULT_CATEGORIES];
+
+  // Filter to only visible categories (for end-user UI)
+  const visibleCategories = allCategories.filter((category) => {
+    const setting = getCategorySetting(category, categorySettings);
+    return !setting.hidden;
+  });
+
+  // Determine the default category (from visible categories only)
   const defaultCategory =
-    availableCategories.length > 0 ? availableCategories[0] : 'General';
+    visibleCategories.length > 0 ? visibleCategories[0] : 'General';
 
   // Getter for category setting with fallback
   const getCategorySettingFn = useCallback(
@@ -166,10 +180,8 @@ export function useCategories(): UseCategoriesResult {
   );
 
   return {
-    categories:
-      availableCategories.length > 0
-        ? availableCategories
-        : [...DEFAULT_CATEGORIES],
+    categories: allCategories,
+    visibleCategories,
     isLoading,
     error,
     defaultCategory,

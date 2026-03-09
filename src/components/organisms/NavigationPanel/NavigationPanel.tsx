@@ -2,6 +2,7 @@
  * NavigationPanel
  * Displays category navigation links in a card panel.
  * Uses dynamic categories from ADO picklist.
+ * Only shows visible categories (hidden categories are filtered out).
  */
 
 import { useAptabase } from '@aptabase/react';
@@ -21,14 +22,15 @@ interface NavigationPanelProps {
  * NavigationPanel component - displays category navigation in a card panel.
  * Uses configurable icons and colors from the settings atom.
  * Categories are dynamically loaded from ADO picklist.
+ * Only visible categories are shown (hidden categories are filtered out by the hook).
  */
 export function NavigationPanel({
   selectedCategory,
   onCategoryClick,
 }: NavigationPanelProps) {
   const { trackEvent } = useAptabase();
-  // Get dynamic categories and settings from hook
-  const { categories, categorySettings, isLoading } = useCategories();
+  // Get dynamic categories and settings from hook - use visibleCategories for end-user UI
+  const { visibleCategories, categorySettings, isLoading } = useCategories();
 
   const handleCategoryClick = (category?: CategoryValue) => {
     trackEvent('category_filtered', { category: category || 'all' });
@@ -75,7 +77,7 @@ export function NavigationPanel({
             <span className="text-sm">Loading...</span>
           </div>
         ) : (
-          categories.map((category) => {
+          visibleCategories.map((category) => {
             const setting = getCategorySetting(category, categorySettings);
             const colorStyles = COLOR_PRESETS[setting.color];
 
