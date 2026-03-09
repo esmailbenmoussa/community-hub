@@ -28,6 +28,8 @@ Personalize Community Hub for your team with features that make your space uniqu
 - **Pin discussions.** Make announcements and important discussions more visible for everyone.
 - **Control visibility.** Choose whether discussions stay within your project, span the organization, or reach specific cross-project teams.
 
+![Category customization settings](public/screenshots/categories.png)
+
 ---
 
 ## Rich content support
@@ -68,6 +70,36 @@ Find what matters with powerful sorting and filtering options.
 | **Most active** | Discussions with the most comments |
 
 Filter by labels, search by title, and quickly navigate to the content you need.
+
+---
+
+## Most Helpful
+
+Recognize and encourage your most active community members with the built-in leaderboard.
+
+- Displays the **top 10 contributors** based on comment activity
+- Shows activity from the **last 30 days** to highlight recent engagement
+- Updates automatically as team members participate
+- Surfaces helpful voices to foster community recognition
+
+![Most Helpful leaderboard showing top contributors](public/screenshots/most-helpful.png)
+
+---
+
+## Admin management
+
+Control who can access sensitive extension settings with designated administrators.
+
+| Permission Level | Access                                                               |
+| ---------------- | -------------------------------------------------------------------- |
+| **Admin**        | Field mapping, category settings, cache management, display settings |
+| **Non-Admin**    | Display settings only                                                |
+
+- Add admins via the Organization Settings page
+- Search and select users with the identity picker
+- First admin added automatically includes you
+
+For detailed setup instructions, see the [Administrator Setup Guide](docs/ADMIN_SETUP_GUIDE.md).
 
 ---
 
