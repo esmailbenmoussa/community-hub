@@ -12,6 +12,7 @@ import { validationService } from '@/services/validation.service';
 import { categorySettingsService } from '@/services/categorySettings.service';
 import { useFieldMapping } from '@/hooks/useFieldMapping';
 import { useCategories } from '@/hooks/useCategories';
+import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { FieldMappingWizard } from '@/components/organisms/FieldMappingWizard/FieldMappingWizard';
 import { Select, SelectOption } from '@/components/atoms/Select';
 import { CategorySettingsRow } from '@/components/molecules/CategorySettingsRow';
@@ -123,6 +124,9 @@ export function SettingsModal({
   const [setupDataError, setSetupDataError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(DEFAULT_USER_PREFERENCES.pageSize);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
+
+  // Admin check
+  const { isCurrentUserAdmin, isCheckingAdmin } = useAdminSettings();
 
   // Category settings state
   const [globalCategorySettings, setGlobalCategorySettings] =
@@ -397,144 +401,207 @@ export function SettingsModal({
                   transition={{ duration: 0.15 }}
                   className="flex-1 space-y-6 overflow-y-auto p-6"
                 >
-                  {/* Field Mapping Section */}
-                  <div>
-                    <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
-                      Field Mapping
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-content-secondary">
-                        Reconfigure field mapping for discussions
-                      </p>
-                      <button
-                        onClick={handleReconfigure}
-                        disabled={loadingSetupData}
-                        className="rounded-ado border border-border px-3 py-1.5 text-sm font-medium text-content transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {loadingSetupData ? 'Loading...' : 'Reconfigure'}
-                      </button>
-                    </div>
-                    {setupDataError && (
-                      <p className="mt-2 text-xs text-red-600">
-                        {setupDataError}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-border" />
-
-                  {/* Display Section */}
-                  <div>
-                    <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
-                      Display
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-content-secondary">
-                        Discussions per page
-                      </p>
-                      {loadingPreferences ? (
-                        <div className="h-9 w-20 animate-pulse rounded-ado bg-surface-tertiary" />
-                      ) : (
-                        <Select
-                          options={pageSizeOptions}
-                          value={String(pageSize)}
-                          onChange={handlePageSizeChange}
-                          className="w-20"
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-border" />
-
-                  {/* Categories Section */}
-                  <div>
-                    <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
-                      Categories
-                    </h3>
-                    <p className="mb-3 text-sm text-content-secondary">
-                      Customize icons and colors for each category
-                    </p>
-                    <div className="space-y-2">
-                      {categoriesToShow.map((category) => (
-                        <CategorySettingsRow
-                          key={category}
-                          category={category}
-                          setting={getCategorySetting(
-                            category,
-                            localCategorySettings
-                          )}
-                          onChange={(setting) =>
-                            handleCategorySettingChange(category, setting)
-                          }
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                      {categorySettingsSaved && (
-                        <span className="text-xs text-green-600">
-                          Settings saved!
-                        </span>
-                      )}
-                      <button
-                        onClick={handleSaveCategorySettings}
-                        disabled={!hasCategoryChanges || savingCategorySettings}
-                        className="rounded-ado bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {savingCategorySettings
-                          ? 'Saving...'
-                          : 'Save Categories'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-border" />
-
-                  {/* Data Section */}
-                  <div>
-                    <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
-                      Data
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <div>
+                  {/* Loading state for admin check */}
+                  {isCheckingAdmin ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center">
+                        <div className="border-brand mx-auto mb-4 h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" />
                         <p className="text-sm text-content-secondary">
-                          Clear cached data
+                          Loading settings...
                         </p>
-                        {cacheCleared && (
-                          <p className="mt-1 text-xs text-green-600">
-                            Cache cleared!
-                          </p>
-                        )}
                       </div>
-                      <button
-                        onClick={handleClearCache}
-                        className="rounded-ado border border-border px-3 py-1.5 text-sm font-medium text-content transition-colors hover:bg-surface-hover"
-                      >
-                        Clear Cache
-                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Field Mapping Section - Admin only */}
+                      {isCurrentUserAdmin && (
+                        <>
+                          <div>
+                            <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
+                              Field Mapping
+                            </h3>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-content-secondary">
+                                Reconfigure field mapping for discussions
+                              </p>
+                              <button
+                                onClick={handleReconfigure}
+                                disabled={loadingSetupData}
+                                className="rounded-ado border border-border px-3 py-1.5 text-sm font-medium text-content transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {loadingSetupData
+                                  ? 'Loading...'
+                                  : 'Reconfigure'}
+                              </button>
+                            </div>
+                            {setupDataError && (
+                              <p className="mt-2 text-xs text-red-600">
+                                {setupDataError}
+                              </p>
+                            )}
+                          </div>
 
-                  {/* Divider */}
-                  <div className="border-t border-border" />
+                          {/* Divider */}
+                          <div className="border-t border-border" />
+                        </>
+                      )}
 
-                  {/* About Section */}
-                  <div>
-                    <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
-                      About
-                    </h3>
-                    <div>
-                      <p className="text-sm font-medium text-content">
-                        Community Hub Extension
-                      </p>
-                      <p className="text-xs text-content-secondary">
-                        Version {version}
-                      </p>
-                    </div>
-                  </div>
+                      {/* Display Section - Everyone */}
+                      <div>
+                        <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
+                          Display
+                        </h3>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-content-secondary">
+                            Discussions per page
+                          </p>
+                          {loadingPreferences ? (
+                            <div className="h-9 w-20 animate-pulse rounded-ado bg-surface-tertiary" />
+                          ) : (
+                            <Select
+                              options={pageSizeOptions}
+                              value={String(pageSize)}
+                              onChange={handlePageSizeChange}
+                              className="w-20"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="border-t border-border" />
+
+                      {/* Categories Section - Admin only */}
+                      {isCurrentUserAdmin && (
+                        <>
+                          <div>
+                            <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
+                              Categories
+                            </h3>
+                            <p className="mb-3 text-sm text-content-secondary">
+                              Customize icons and colors for each category
+                            </p>
+                            <div className="space-y-2">
+                              {categoriesToShow.map((category) => (
+                                <CategorySettingsRow
+                                  key={category}
+                                  category={category}
+                                  setting={getCategorySetting(
+                                    category,
+                                    localCategorySettings
+                                  )}
+                                  onChange={(setting) =>
+                                    handleCategorySettingChange(
+                                      category,
+                                      setting
+                                    )
+                                  }
+                                />
+                              ))}
+                            </div>
+                            <div className="mt-4 flex items-center justify-end gap-2">
+                              {categorySettingsSaved && (
+                                <span className="text-xs text-green-600">
+                                  Settings saved!
+                                </span>
+                              )}
+                              <button
+                                onClick={handleSaveCategorySettings}
+                                disabled={
+                                  !hasCategoryChanges || savingCategorySettings
+                                }
+                                className="rounded-ado bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {savingCategorySettings
+                                  ? 'Saving...'
+                                  : 'Save Categories'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="border-t border-border" />
+
+                          {/* Data Section - Admin only */}
+                          <div>
+                            <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
+                              Data
+                            </h3>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm text-content-secondary">
+                                  Clear cached data
+                                </p>
+                                {cacheCleared && (
+                                  <p className="mt-1 text-xs text-green-600">
+                                    Cache cleared!
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={handleClearCache}
+                                className="rounded-ado border border-border px-3 py-1.5 text-sm font-medium text-content transition-colors hover:bg-surface-hover"
+                              >
+                                Clear Cache
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="border-t border-border" />
+                        </>
+                      )}
+
+                      {/* About Section - Everyone */}
+                      <div>
+                        <h3 className="mb-3 text-xs font-semibold uppercase text-content-disabled">
+                          About
+                        </h3>
+                        <div>
+                          <p className="text-sm font-medium text-content">
+                            Community Hub Extension
+                          </p>
+                          <p className="text-xs text-content-secondary">
+                            Version {version}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Non-admin info message */}
+                      {!isCurrentUserAdmin && (
+                        <div className="rounded-ado border border-amber-200 bg-amber-50 p-3">
+                          <div className="flex items-start gap-2">
+                            <svg
+                              className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                              />
+                            </svg>
+                            <div className="text-sm text-amber-800">
+                              <p className="font-medium">
+                                Only Community Hub Admins can view these
+                                settings
+                              </p>
+                              <p className="mt-1">
+                                Settings like field mapping, category
+                                customization, and cache management are
+                                restricted to designated admins. Admins are
+                                configured in the Organization Settings page by
+                                Project Collection Administrators.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div

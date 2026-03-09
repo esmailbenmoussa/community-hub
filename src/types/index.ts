@@ -5,6 +5,7 @@ export * from './discussion';
 export * from './setup';
 export * from './fieldMapping';
 export * from './categorySettings';
+export * from './admin';
 
 /**
  * Azure DevOps context returned by useAzureDevOps hook

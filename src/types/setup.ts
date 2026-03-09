@@ -239,6 +239,8 @@ export const EDS_COLLECTIONS = {
   FieldMapping: 'community-hub-field-mapping',
   /** Project-scoped category settings (icons and colors) */
   CategorySettings: 'community-hub-category-settings',
+  /** Organization-scoped admin settings */
+  AdminSettings: 'community-hub-admin-settings',
 } as const;
 
 // ============================================

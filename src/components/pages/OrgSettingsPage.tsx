@@ -4,7 +4,7 @@
  * Accessed via ?view=org query parameter
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAptabase } from '@aptabase/react';
 import { useOrgDiscussions } from '@/hooks/useOrgDiscussions';
 import { useToast } from '@/hooks/useToast';
@@ -13,7 +13,11 @@ import { Select, SelectOption } from '@/components/atoms/Select';
 import { Pagination } from '@/components/atoms/Pagination';
 import { CategoryBadge } from '@/components/atoms/CategoryBadge';
 import { TimeAgo } from '@/components/atoms/TimeAgo';
+import { AdminListManager } from '@/components/organisms/AdminListManager';
 import { Discussion } from '@/types';
+
+/** Active tab type */
+type OrgSettingsTab = 'discussions' | 'admins';
 
 /**
  * Pin toggle button component
@@ -229,6 +233,8 @@ export function OrgSettingsPage() {
   const { trackEvent } = useAptabase();
   const { showSuccess, showError } = useToast();
 
+  const [activeTab, setActiveTab] = useState<OrgSettingsTab>('discussions');
+
   const {
     discussions,
     projects,
@@ -332,119 +338,139 @@ export function OrgSettingsPage() {
         </div>
       </header>
 
+      {/* Tab navigation */}
+      <div className="border-b border-border bg-surface">
+        <div className="mx-auto max-w-7xl px-6">
+          <nav className="-mb-px flex gap-6">
+            <button
+              onClick={() => setActiveTab('discussions')}
+              className={`border-b-2 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'discussions'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-content-secondary hover:border-border hover:text-content'
+              }`}
+            >
+              Pinned Discussions
+            </button>
+            <button
+              onClick={() => setActiveTab('admins')}
+              className={`border-b-2 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'admins'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-content-secondary hover:border-border hover:text-content'
+              }`}
+            >
+              Admin Management
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {/* Main content */}
       <main className="mx-auto max-w-7xl px-6 py-6">
-        {/* Section: Pinned Discussions */}
-        <section>
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-content">
-              Manage Pinned Discussions
-            </h2>
-            <p className="mt-1 text-sm text-content-secondary">
-              Pin important discussions to keep them at the top of the
-              discussion list. Pinned discussions will be visible to all users
-              in the organization.
-            </p>
-          </div>
-
-          {/* Filters */}
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Select
-                options={projectOptions}
-                value={selectedProjectId || ''}
-                onChange={handleProjectChange}
-                placeholder="All Projects"
-                className="w-48"
-                disabled={isLoadingProjects}
-              />
-              {totalCount > 0 && (
-                <span className="text-sm text-content-secondary">
-                  {totalCount} discussion{totalCount !== 1 ? 's' : ''}
-                </span>
-              )}
+        {activeTab === 'discussions' ? (
+          /* Section: Pinned Discussions */
+          <section>
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-content">
+                Manage Pinned Discussions
+              </h2>
+              <p className="mt-1 text-sm text-content-secondary">
+                Pin important discussions to keep them at the top of the
+                discussion list. Pinned discussions will be visible to all users
+                in the organization.
+              </p>
             </div>
-          </div>
 
-          {/* Error banner */}
-          {error && (
-            <div className="mb-4 rounded-ado border border-red-300 bg-red-50 p-4 text-red-700">
-              <p className="font-medium">Error loading discussions</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* Discussion table */}
-          <div className="overflow-hidden rounded-lg border border-border bg-surface">
-            <table className="w-full">
-              <thead className="bg-surface-secondary">
-                <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
-                    Discussion
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
-                    Project
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
-                    Created
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
-                    Stats
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <TableSkeleton />
-                ) : discussions.length === 0 ? (
-                  <EmptyState hasFilter={!!selectedProjectId} />
-                ) : (
-                  discussions.map((discussion) => (
-                    <DiscussionTableRow
-                      key={discussion.id}
-                      discussion={discussion}
-                      onTogglePin={handleTogglePin}
-                      isPinning={isLoading}
-                    />
-                  ))
+            {/* Filters */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Select
+                  options={projectOptions}
+                  value={selectedProjectId || ''}
+                  onChange={handleProjectChange}
+                  placeholder="All Projects"
+                  className="w-48"
+                  disabled={isLoadingProjects}
+                />
+                {totalCount > 0 && (
+                  <span className="text-sm text-content-secondary">
+                    {totalCount} discussion{totalCount !== 1 ? 's' : ''}
+                  </span>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-center">
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                onPageChange={goToPage}
-                disabled={isLoading}
-              />
+              </div>
             </div>
-          )}
-        </section>
 
-        {/* Placeholder for future settings sections */}
-        {/* 
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-content">
-            Category Settings
-          </h2>
-          <p className="mt-1 text-sm text-content-secondary">
-            Configure which categories are available in your organization.
-          </p>
-          <div className="mt-4 rounded-lg border border-border bg-surface-secondary p-6 text-center text-content-secondary">
-            Coming soon
-          </div>
-        </section>
-        */}
+            {/* Error banner */}
+            {error && (
+              <div className="mb-4 rounded-ado border border-red-300 bg-red-50 p-4 text-red-700">
+                <p className="font-medium">Error loading discussions</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Discussion table */}
+            <div className="overflow-hidden rounded-lg border border-border bg-surface">
+              <table className="w-full">
+                <thead className="bg-surface-secondary">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
+                      Discussion
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
+                      Project
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
+                      Category
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-content-secondary">
+                      Stats
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <TableSkeleton />
+                  ) : discussions.length === 0 ? (
+                    <EmptyState hasFilter={!!selectedProjectId} />
+                  ) : (
+                    discussions.map((discussion) => (
+                      <DiscussionTableRow
+                        key={discussion.id}
+                        discussion={discussion}
+                        onTogglePin={handleTogglePin}
+                        isPinning={isLoading}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+          </section>
+        ) : (
+          /* Section: Admin Management */
+          <section>
+            <AdminListManager />
+          </section>
+        )}
       </main>
     </div>
   );
