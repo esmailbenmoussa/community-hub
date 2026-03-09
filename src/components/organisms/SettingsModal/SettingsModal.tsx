@@ -422,7 +422,8 @@ export function SettingsModal({
                             </h3>
                             <div className="flex items-center justify-between">
                               <p className="text-sm text-content-secondary">
-                                Reconfigure field mapping for discussions
+                                Reconfigure field mapping for discussions.
+                                Reconfigure to sync newly added categories.
                               </p>
                               <button
                                 onClick={handleReconfigure}
