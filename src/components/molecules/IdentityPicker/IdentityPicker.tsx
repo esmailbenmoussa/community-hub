@@ -222,18 +222,10 @@ export function IdentityPicker({
                         : 'hover:bg-surface-hover'
                     }`}
                   >
-                    {/* Avatar */}
-                    {user.imageUrl ? (
-                      <img
-                        src={user.imageUrl}
-                        alt={user.displayName}
-                        className="h-8 w-8 rounded-full"
-                      />
-                    ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-medium text-white">
-                        {user.displayName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    {/* Avatar - using initials */}
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-medium text-white">
+                      {user.displayName.charAt(0).toUpperCase()}
+                    </div>
                     {/* User info */}
                     <div className="flex-1 overflow-hidden">
                       <div className="truncate text-sm font-medium text-content">

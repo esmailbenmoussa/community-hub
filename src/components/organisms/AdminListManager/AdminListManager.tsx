@@ -25,18 +25,10 @@ function AdminRow({
   return (
     <div className="flex items-center justify-between rounded-ado border border-border bg-surface p-3 transition-colors hover:bg-surface-hover">
       <div className="flex items-center gap-3">
-        {/* Avatar */}
-        {admin.imageUrl ? (
-          <img
-            src={admin.imageUrl}
-            alt={admin.displayName}
-            className="h-10 w-10 rounded-full"
-          />
-        ) : (
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-medium text-white">
-            {admin.displayName.charAt(0).toUpperCase()}
-          </div>
-        )}
+        {/* Avatar - using initials */}
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-medium text-white">
+          {admin.displayName.charAt(0).toUpperCase()}
+        </div>
         {/* Info */}
         <div>
           <div className="font-medium text-content">{admin.displayName}</div>
